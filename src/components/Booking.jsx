@@ -259,15 +259,15 @@ export default function Booking() {
                         {/* Slots */}
                         <div className="space-y-2">
                           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Time Slot</label>
-                          <div className="grid grid-cols-3 gap-2 max-h-[180px] overflow-y-auto pr-1">
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[220px] overflow-y-auto pr-1">
                             {getTimeSlotsForBranch().map((slot) => (
                               <button
                                 key={slot}
                                 type="button"
                                 onClick={() => setFormData({ ...formData, timeSlot: slot })}
-                                className={`py-2 px-1 rounded-lg border text-center transition-all text-xs font-bold ${
+                                className={`py-3 px-1 rounded-xl border text-center transition-all text-xs font-bold min-h-[44px] flex items-center justify-center cursor-pointer ${
                                   formData.timeSlot === slot
-                                    ? 'bg-teal-600 border-teal-600 text-white'
+                                    ? 'bg-teal-600 border-teal-600 text-white shadow-md shadow-teal-600/10'
                                     : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-350'
                                 }`}
                               >
