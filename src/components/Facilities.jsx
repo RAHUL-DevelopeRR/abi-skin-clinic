@@ -9,10 +9,7 @@ import consultationImg from '../assets/patient_consultation.png';
 
 // Real clinic photo assets
 import realExterior1 from '../assets/clinic_real_exterior_1.jpg';
-import realExterior2 from '../assets/clinic_real_exterior_2.jpg';
 import realSignboard1 from '../assets/clinic_real_signboard_1.jpg';
-import realSignboard2 from '../assets/clinic_real_signboard_2.jpg';
-import realSignboard3 from '../assets/clinic_real_signboard_3.jpg';
 
 const CATEGORIES = [
   { id: 'all', label: 'All Photos' },
@@ -29,28 +26,10 @@ const IMAGES = [
     description: 'Actual exterior view of ABI Skin & Hair Clinic building, located near Pugali Mandapam.'
   },
   {
-    src: realExterior2,
-    category: 'exterior',
-    title: 'Velayuthampalayam Bypass Premises',
-    description: 'Another angle showing our spacious, dedicated clinic building with convenient patient access.'
-  },
-  {
     src: realSignboard1,
     category: 'signboard',
     title: 'Dr. G. Srinivasan Board & Consultation Hours',
     description: 'Our official signboard detailing Dr. Srinivasan G.\'s credentials (MBBS, DD) and consultation timings.'
-  },
-  {
-    src: realSignboard2,
-    category: 'signboard',
-    title: 'ABI Skin & Hair Clinic Entrance Board',
-    description: 'Prominent branding signboard visible from the bypass road to guide patients easily to our clinic.'
-  },
-  {
-    src: realSignboard3,
-    category: 'signboard',
-    title: 'Consultation Hours & Contact Info',
-    description: 'Official consulting schedule details: Evening 5:00 PM to Night 9:00 PM at Velayuthampalayam.'
   },
   {
     src: lobbyImg,
