@@ -1,0 +1,95 @@
+import React from 'react';
+
+export default function ClinicLogo({ className = "w-10 h-12" }) {
+  return (
+    <svg 
+      viewBox="0 0 200 240" 
+      className={className}
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        {/* Curved path for bottom slogan text */}
+        <path id="textCurve" d="M 25,198 Q 100,230 175,198" />
+      </defs>
+
+      {/* Isometric 3D Cube Group */}
+      <g stroke="#ffffff" strokeWidth="4.5" strokeLinejoin="round" strokeLinecap="round">
+        {/* Top Face - Burgundy / Dark Pink */}
+        <polygon 
+          points="100,30 40,65 100,100 160,65" 
+          fill="#8e1d22" 
+        />
+        
+        {/* Left Face - Dark Navy Blue */}
+        <polygon 
+          points="40,65 100,100 100,180 40,145" 
+          fill="#0f1c3f" 
+        />
+        
+        {/* Right Face - Navy Blue */}
+        <polygon 
+          points="100,100 160,65 160,145 100,180" 
+          fill="#15244c" 
+        />
+      </g>
+
+      {/* Isometric text on Top Face */}
+      <text 
+        transform="translate(100, 68) rotate(-30) skewX(30) scale(1, 0.86)" 
+        textAnchor="middle" 
+        dominantBaseline="middle"
+        fill="#ffffff"
+        fontSize="17"
+        fontWeight="900"
+        fontFamily="Georgia, serif"
+        letterSpacing="0.5"
+      >
+        SKIN
+      </text>
+
+      {/* Isometric text on Left Face */}
+      <text 
+        transform="translate(70, 122) skewY(30)" 
+        textAnchor="middle" 
+        dominantBaseline="middle"
+        fill="#ffffff"
+        fontSize="17"
+        fontWeight="900"
+        fontFamily="Georgia, serif"
+        letterSpacing="0.5"
+      >
+        HAIR
+      </text>
+
+      {/* Isometric text on Right Face */}
+      <text 
+        transform="translate(130, 122) skewY(-30)" 
+        textAnchor="middle" 
+        dominantBaseline="middle"
+        fill="#ffffff"
+        fontSize="17"
+        fontWeight="900"
+        fontFamily="Georgia, serif"
+        letterSpacing="0.5"
+      >
+        NAIL
+      </text>
+
+      {/* Slogan Text: "Mind Your Skin" */}
+      <text className="fill-slate-800 dark:fill-slate-200 transition-colors duration-300">
+        <textPath 
+          href="#textCurve" 
+          startOffset="50%" 
+          textAnchor="middle"
+          fontSize="15"
+          fontWeight="800"
+          fontFamily="'Outfit', sans-serif"
+          letterSpacing="0.5"
+        >
+          Mind Your Skin
+        </textPath>
+      </text>
+    </svg>
+  );
+}

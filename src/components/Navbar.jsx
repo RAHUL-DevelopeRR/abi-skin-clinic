@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Moon, Sun, HelpCircle, Menu, X, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ClinicLogo from './ClinicLogo';
 
 export default function Navbar({ darkTheme, setDarkTheme, activeView, setActiveView }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -23,9 +24,7 @@ export default function Navbar({ darkTheme, setDarkTheme, activeView, setActiveV
             }}
             className="flex items-center gap-3 group cursor-pointer"
           >
-            <div className="w-10 h-10 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center font-serif text-lg font-bold tracking-tighter shadow-md transition-transform group-hover:scale-105">
-              A
-            </div>
+            <ClinicLogo className="w-10 h-12 -mt-1 group-hover:scale-105 transition-transform" />
             <div className="text-left">
               <span className="block font-extrabold text-base tracking-tight text-slate-900 dark:text-white -mb-1">
                 ABI SKIN & HAIR

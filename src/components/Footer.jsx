@@ -1,4 +1,5 @@
 import { Sparkles, HeartPulse, ExternalLink } from 'lucide-react';
+import ClinicLogo from './ClinicLogo';
 
 export default function Footer() {
   return (
@@ -8,10 +9,8 @@ export default function Footer() {
           
           {/* Logo & Slogan */}
           <div className="md:col-span-2 space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-teal-500 text-white shadow-lg shadow-teal-500/10">
-                <Sparkles className="w-5 h-5" />
-              </div>
+            <div className="flex items-center gap-3">
+              <ClinicLogo className="w-10 h-12" />
               <div>
                 <span className="font-extrabold text-xl tracking-tight text-white">
                   ABI SKIN & HAIR
