@@ -219,7 +219,7 @@ const SLIDES = [
           <div className="text-3xl font-extrabold text-teal-400">1-2 Bookings / Month</div>
           <p className="text-xs font-bold text-slate-450 uppercase tracking-wider">Pays for the annual hosting cost entirely</p>
           <div className="text-xs text-slate-400 text-left bg-slate-900/60 p-4 rounded-xl border border-slate-800/80">
-            <strong>The Bottom Line:</strong> The website acts as a quiet clinical assistant. It answers maps, schedules patient slots, showcases Dr. Srinivasan's DDVL credentials, and siphons cosmetic clients—running 100% on autopilot.
+            <strong>The Bottom Line:</strong> The website acts as a quiet clinical assistant. It answers maps, schedules patient slots, showcases Dr. Srinivasan's DD credentials, and siphons cosmetic clients—running 100% on autopilot.
           </div>
         </div>
       </div>

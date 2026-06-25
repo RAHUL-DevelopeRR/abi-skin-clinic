@@ -43,11 +43,11 @@ export default function Hero() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="text-base sm:text-lg md:text-xl text-slate-655 dark:text-slate-350 mb-10 max-w-2xl font-medium leading-relaxed"
+          className="text-base sm:text-lg md:text-xl text-slate-655 dark:text-slate-355 mb-10 max-w-2xl font-medium leading-relaxed"
         >
           Experience premium clinical dermatology, trichology, and advanced aesthetic treatments led by{' '}
           <span className="font-bold text-slate-800 dark:text-slate-100 border-b-2 border-teal-500/30">
-            Dr. Srinivasan G. (MBBS, DDVL)
+            Dr. Srinivasan G. (MBBS, DD)
           </span>{' '}
           with over 16 years of certified medical experience.
         </motion.p>

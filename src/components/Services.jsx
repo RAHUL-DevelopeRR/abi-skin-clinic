@@ -11,6 +11,7 @@ const SERVICES_DATA = [
     title: 'Acne & Scar Revision',
     description: 'Advanced clinical treatments for active acne, cystic breakouts, and deep acne scars. Utilizes localized peels and micro-needling.',
     sessions: '3-6 Sessions',
+    image: 'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?auto=format&fit=crop&w=600&q=80',
     highlights: ['Comedone extraction', 'Salicylic peels', 'Scar resurfacing']
   },
   {
@@ -19,6 +20,7 @@ const SERVICES_DATA = [
     title: 'Eczema & Psoriasis Management',
     description: 'Specialized treatment plans for chronic skin conditions, providing quick relief from itching, inflammation, and scaling.',
     sessions: 'Ongoing support',
+    image: 'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?auto=format&fit=crop&w=600&q=80',
     highlights: ['Steroid-free alternatives', 'Biologics consulting', 'Dietary trigger guidance']
   },
   {
@@ -27,6 +29,7 @@ const SERVICES_DATA = [
     title: 'Wart, Mole & Tag Removal',
     description: 'Quick, safe, and virtually painless radiofrequency cauterization or laser removal of warts, moles, skin tags, and DPNs.',
     sessions: '1 Session (Instant)',
+    image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=600&q=80',
     highlights: ['Scarless healing', 'Local anesthesia', 'Same-day biopsy check']
   },
   
@@ -37,6 +40,7 @@ const SERVICES_DATA = [
     title: 'PRP Hair Rejuvenation',
     description: 'Platelet-Rich Plasma therapy using your own growth factors to stimulate dormant follicles, increase density, and stop hair thinning.',
     sessions: '4-8 Sessions',
+    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=600&q=80',
     highlights: ['High-density spin tubes', 'Minimal downtime', 'Natural follicular growth']
   },
   {
@@ -45,6 +49,7 @@ const SERVICES_DATA = [
     title: 'Alopecia & Thinning Treatment',
     description: 'Comprehensive trichology analysis to combat alopecia areata and male/female pattern baldness with customized medical plans.',
     sessions: '3-12 Months Plan',
+    image: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=600&q=80',
     highlights: ['DHT blocker therapy', 'Laser comb stimulation', 'Nutritional guidance']
   },
   {
@@ -53,6 +58,7 @@ const SERVICES_DATA = [
     title: 'Anti-Dandruff & Scalp Detox',
     description: 'Medical scalp peeling and anti-fungal treatments to eliminate stubborn dandruff, seborrheic dermatitis, and scalp itching.',
     sessions: '2-4 Sessions',
+    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80',
     highlights: ['Scalp scaling', 'Laser blue light therapy', 'PH balancing rinse']
   },
 
@@ -63,6 +69,7 @@ const SERVICES_DATA = [
     title: 'Hydrafacial & Skin Polishing',
     description: 'Multi-step skin resurfacing that cleanses, exfoliates, and extracts impurities while infusing vital antioxidants and hydration.',
     sessions: 'Monthly maintenance',
+    image: 'https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?auto=format&fit=crop&w=600&q=80',
     highlights: ['Vortex suction cleaning', 'Hyaluronic acid infusion', 'Instant red-carpet glow']
   },
   {
@@ -71,6 +78,7 @@ const SERVICES_DATA = [
     title: 'Laser Hair Reduction',
     description: 'US-FDA approved diode laser technology for safe, permanent reduction of unwanted hair on face, underarms, or full body.',
     sessions: '6-8 Sessions',
+    image: 'https://images.unsplash.com/photo-1600428877874-5a2423bb0f0c?auto=format&fit=crop&w=600&q=80',
     highlights: ['Cooling tip technology', 'Pain-free sessions', 'Safe for all Indian skin types']
   },
   {
@@ -79,6 +87,7 @@ const SERVICES_DATA = [
     title: 'Carbon Laser Peel & Toning',
     description: 'Also known as the "Hollywood Peel." Lasing action targets carbon particles to tighten pores, reduce pigmentation, and brighten tone.',
     sessions: '3-5 Sessions',
+    image: 'https://images.unsplash.com/photo-1552693673-1bf958298935?auto=format&fit=crop&w=600&q=80',
     highlights: ['Deep pore tightening', 'Oil control', 'Immediate brightening']
   }
 ];
@@ -112,7 +121,7 @@ export default function Services() {
             <button
               key={cat}
               onClick={() => setActiveTab(cat)}
-              className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer ${
+              className={`relative px-6 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer ${
                 activeTab === cat
                   ? 'bg-teal-600 text-white shadow-md shadow-teal-600/10'
                   : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/50 dark:border-slate-850'
@@ -152,6 +161,16 @@ export default function Services() {
                           <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200/20">
                             {service.sessions}
                           </span>
+                        </div>
+
+                        {/* Service Image Banner */}
+                        <div className="w-full h-44 rounded-2xl overflow-hidden mb-6 bg-slate-100 dark:bg-slate-900 border border-slate-200/20 dark:border-slate-800/20 relative shadow-sm">
+                          <img 
+                            src={service.image} 
+                            alt={service.title} 
+                            className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500" 
+                            loading="lazy"
+                          />
                         </div>
 
                         {/* Title */}

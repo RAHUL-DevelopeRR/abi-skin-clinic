@@ -22,7 +22,7 @@ export default function About() {
                 />
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-950/80 to-transparent p-6 text-white text-left z-20">
                   <span className="block font-extrabold text-lg">Dr. Srinivasan G.</span>
-                  <span className="block text-xs text-teal-400 font-bold tracking-wider">MBBS, DDVL • Chief Dermatologist</span>
+                  <span className="block text-xs text-teal-400 font-bold tracking-wider">MBBS, DD • Chief Dermatologist</span>
                 </div>
               </div>
             </TiltedCard>
@@ -59,7 +59,7 @@ export default function About() {
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Qualifications</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">MBBS, DDVL (Dermatology, Venereology & Leprosy) from premium medical institutes.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">MBBS, DD (Diploma in Dermatology) from premium medical institutes.</p>
                 </div>
               </div>
 
