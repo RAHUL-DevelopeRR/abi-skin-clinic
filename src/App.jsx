@@ -8,7 +8,7 @@ import Booking from './components/Booking';
 import Footer from './components/Footer';
 import PitchDeck from './components/PitchDeck';
 import Facilities from './components/Facilities';
-import exteriorImg from './assets/clinic_exterior.png';
+import exteriorImg from './assets/clinic_real_exterior_1.jpg';
 import treatmentImg from './assets/clinic_treatment_room.png';
 import { Target, Calendar, Award, ShieldCheck, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
