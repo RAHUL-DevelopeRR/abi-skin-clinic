@@ -99,6 +99,24 @@ export default function Booking() {
     setErrors({});
   };
 
+  const handleWhatsAppSend = () => {
+    const phoneNumber = "917598126430"; // Main clinic WhatsApp number
+    const message = `🏥 *ABI Skin & Hair Clinic - Appointment Booking*
+----------------------------------------
+🎟️ *Booking ID:* ${bookingId}
+👤 *Patient Name:* ${formData.name}
+📱 *Phone Number:* ${formData.phone}
+📍 *Clinic Branch:* ${formData.branch} Branch
+🩺 *Treatment:* ${formData.service}
+📅 *Date:* ${formData.date}
+⏰ *Time Slot:* ${formData.timeSlot}
+${formData.notes ? `📝 *Additional Notes:* ${formData.notes}` : ''}
+----------------------------------------
+Hi Dr. G. Srinivasan, I have submitted an appointment request on the website. Please confirm my consultation slot!`;
+    const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <section id="book" className="py-24 px-6 relative overflow-hidden bg-white dark:bg-slate-950">
       <div className="max-w-3xl mx-auto relative z-10">
@@ -409,17 +427,21 @@ export default function Booking() {
               <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
                 <button
                   type="button"
+                  onClick={handleWhatsAppSend}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm transition-colors shadow-md shadow-green-600/15 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <svg className="w-4.5 h-4.5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.97-1.861-1.868-4.333-2.897-6.963-2.899-5.437 0-9.862 4.37-9.866 9.8-.001 1.774.475 3.504 1.378 5.008L1.948 21.53l5.7-.733.001-.001zM17.81 14.54c-.302-.15-1.785-.88-2.062-.98-.277-.1-.478-.15-.679.15-.202.302-.782.98-.958 1.18-.175.2-.351.224-.653.075-1.206-.604-1.997-1.054-2.785-1.74-.788-.686-1.396-1.564-1.597-1.914-.202-.351-.021-.541.13-.692.135-.135.302-.351.453-.528.15-.176.2-.301.302-.503.1-.2.05-.377-.025-.528-.075-.15-.679-1.635-.93-2.237-.245-.588-.493-.508-.679-.518-.175-.01-.377-.01-.579-.01-.202 0-.528.075-.805.378-.277.301-1.057 1.03-1.057 2.512 0 1.482 1.082 2.913 1.232 3.114.15.2 2.13 3.25 5.159 4.561.72.31 1.282.498 1.719.638.723.23 1.382.198 1.902.12.579-.088 1.786-.73 2.038-1.432.252-.703.252-1.307.176-1.433-.075-.125-.277-.201-.579-.352z"/>
+                  </svg>
+                  <span>Confirm on WhatsApp</span>
+                </button>
+                <button
+                  type="button"
                   onClick={handleReset}
                   className="px-6 py-3 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-355 font-bold rounded-xl text-sm transition-colors cursor-pointer"
                 >
-                  Book Another Appointment
+                  Book New Slot
                 </button>
-                <a
-                  href="#home"
-                  className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-sm transition-colors shadow-md shadow-teal-600/10 text-center"
-                >
-                  Go to Home
-                </a>
               </div>
             </motion.div>
           )}

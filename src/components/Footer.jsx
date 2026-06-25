@@ -51,7 +51,7 @@ export default function Footer() {
               </li>
               <li>
                 <span className="block text-slate-500">Email Enquiries:</span>
-                <a href="mailto:info@abiskinclinic.com" className="text-slate-350 hover:text-white transition-colors">info@abiskinclinic.com</a>
+                <a href="mailto:abiskinandhairclinic@gmail.com" className="text-slate-350 hover:text-white transition-colors">abiskinandhairclinic@gmail.com</a>
               </li>
             </ul>
           </div>
@@ -64,7 +64,7 @@ export default function Footer() {
             &copy; {new Date().getFullYear()} ABI Skin & Hair Clinic. All rights reserved.
           </div>
           <div className="text-slate-500 font-medium text-center md:text-right max-w-md">
-            Disclaimer: This is a premium proposal/pitch demo design for ABI Skin & Hair Clinic. All medical information and trademarks are properties of their respective owners.
+            ABI Skin & Hair Care Clinic is dedicated to offering advanced clinical dermatology, trichology, and non-surgical aesthetic procedures.
           </div>
         </div>
 

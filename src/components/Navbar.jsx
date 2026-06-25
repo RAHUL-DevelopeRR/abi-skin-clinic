@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Moon, Sun, HelpCircle, Menu, X, Calendar } from 'lucide-react';
+import { Moon, Sun, Menu, X, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ClinicLogo from './ClinicLogo';
 
-export default function Navbar({ darkTheme, setDarkTheme, activeView, setActiveView }) {
+export default function Navbar({ darkTheme, setDarkTheme }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -15,13 +15,10 @@ export default function Navbar({ darkTheme, setDarkTheme, activeView, setActiveV
     >
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between">
-          {/* Logo Monogram */}
+          {/* Logo Monogram & Branding */}
           <a 
             href="#home" 
-            onClick={() => {
-              setActiveView('website');
-              setIsOpen(false);
-            }}
+            onClick={() => setIsOpen(false)}
             className="flex items-center gap-3 group cursor-pointer"
           >
             <ClinicLogo className="w-10 h-12 -mt-1 group-hover:scale-105 transition-transform" />
@@ -37,49 +34,25 @@ export default function Navbar({ darkTheme, setDarkTheme, activeView, setActiveV
 
           {/* Desktop Nav Links */}
           <div className="hidden md:flex items-center gap-8">
-            {activeView === 'website' ? (
-              <>
-                <a href="#services" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
-                  Treatments
-                </a>
-                <a href="#about" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
-                  The Doctor
-                </a>
-                <a href="#facilities" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
-                  Our Facilities
-                </a>
-                <a href="#branches" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
-                  Branches & Hours
-                </a>
-                <a href="#book" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
-                  Book Visit
-                </a>
-              </>
-            ) : (
-              <span className="text-xs font-bold py-1 px-3 bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 rounded-full border border-teal-200/50 dark:border-teal-800/40 uppercase tracking-wider">
-                Strategic Proposal Mode
-              </span>
-            )}
+            <a href="#services" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+              Treatments
+            </a>
+            <a href="#about" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+              The Doctor
+            </a>
+            <a href="#facilities" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+              Our Facilities
+            </a>
+            <a href="#branches" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+              Branches & Hours
+            </a>
+            <a href="#book" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+              Book Visit
+            </a>
           </div>
 
           {/* Desktop Actions */}
           <div className="flex items-center gap-4">
-            {/* Pitch Switcher */}
-            <button
-              onClick={() => {
-                setActiveView(activeView === 'website' ? 'pitch' : 'website');
-                setIsOpen(false);
-              }}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
-                activeView === 'pitch' 
-                  ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/10' 
-                  : 'bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 hover:bg-teal-100/70 dark:hover:bg-teal-950/70 border border-teal-200/30 dark:border-teal-900/30'
-              }`}
-            >
-              <HelpCircle className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{activeView === 'website' ? 'Proposal Pitch' : 'Back to Site'}</span>
-            </button>
-
             {/* Theme Toggle */}
             <button
               onClick={() => setDarkTheme(!darkTheme)}
@@ -99,14 +72,12 @@ export default function Navbar({ darkTheme, setDarkTheme, activeView, setActiveV
             </button>
 
             {/* Booking Shortcut Button */}
-            {activeView === 'website' && (
-              <a
-                href="#book"
-                className="hidden lg:flex items-center gap-1 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md shadow-teal-600/15 hover:shadow-teal-600/25 transition-all text-xs uppercase tracking-wider"
-              >
-                Book Appointment
-              </a>
-            )}
+            <a
+              href="#book"
+              className="hidden lg:flex items-center gap-1 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md shadow-teal-600/15 hover:shadow-teal-600/25 transition-all text-xs uppercase tracking-wider"
+            >
+              Book Appointment
+            </a>
           </div>
         </div>
 
@@ -120,52 +91,42 @@ export default function Navbar({ darkTheme, setDarkTheme, activeView, setActiveV
               transition={{ duration: 0.3 }}
               className="md:hidden mt-4 pt-4 border-t border-slate-200/40 dark:border-slate-800/40 flex flex-col gap-3.5 text-left"
             >
-              {activeView === 'website' ? (
-                <>
-                  <a 
-                    href="#services" 
-                    onClick={() => setIsOpen(false)}
-                    className="font-bold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 py-1 transition-colors"
-                  >
-                    Treatments
-                  </a>
-                  <a 
-                    href="#about" 
-                    onClick={() => setIsOpen(false)}
-                    className="font-bold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 py-1 transition-colors"
-                  >
-                    The Doctor
-                  </a>
-                  <a 
-                    href="#facilities" 
-                    onClick={() => setIsOpen(false)}
-                    className="font-bold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 py-1 transition-colors"
-                  >
-                    Our Facilities
-                  </a>
-                  <a 
-                    href="#branches" 
-                    onClick={() => setIsOpen(false)}
-                    className="font-bold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 py-1 transition-colors"
-                  >
-                    Branches & Hours
-                  </a>
-                  <a 
-                    href="#book" 
-                    onClick={() => setIsOpen(false)}
-                    className="font-bold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 py-1 transition-colors flex items-center gap-1.5"
-                  >
-                    <Calendar className="w-4 h-4 text-teal-650" />
-                    <span>Book Appointment</span>
-                  </a>
-                </>
-              ) : (
-                <div className="py-2">
-                  <span className="text-[10px] font-extrabold py-1.5 px-3 bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 rounded-full border border-teal-200/50 dark:border-teal-800/40 uppercase tracking-widest">
-                    Proposal Pitch Mode
-                  </span>
-                </div>
-              )}
+              <a 
+                href="#services" 
+                onClick={() => setIsOpen(false)}
+                className="font-bold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 py-1 transition-colors"
+              >
+                Treatments
+              </a>
+              <a 
+                href="#about" 
+                onClick={() => setIsOpen(false)}
+                className="font-bold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 py-1 transition-colors"
+              >
+                The Doctor
+              </a>
+              <a 
+                href="#facilities" 
+                onClick={() => setIsOpen(false)}
+                className="font-bold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 py-1 transition-colors"
+              >
+                Our Facilities
+              </a>
+              <a 
+                href="#branches" 
+                onClick={() => setIsOpen(false)}
+                className="font-bold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 py-1 transition-colors"
+              >
+                Branches & Hours
+              </a>
+              <a 
+                href="#book" 
+                onClick={() => setIsOpen(false)}
+                className="font-bold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 py-1 transition-colors flex items-center gap-1.5"
+              >
+                <Calendar className="w-4 h-4 text-teal-650" />
+                <span>Book Appointment</span>
+              </a>
             </motion.div>
           )}
         </AnimatePresence>
