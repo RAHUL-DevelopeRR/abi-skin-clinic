@@ -29,7 +29,7 @@ const SERVICES_DATA = [
     title: 'Wart, Mole & Tag Removal',
     description: 'Quick, safe, and virtually painless radiofrequency cauterization or laser removal of warts, moles, skin tags, and DPNs.',
     sessions: '1 Session (Instant)',
-    image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=600&q=80',
+    image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
     highlights: ['Scarless healing', 'Local anesthesia', 'Same-day biopsy check']
   },
   
@@ -40,7 +40,7 @@ const SERVICES_DATA = [
     title: 'PRP Hair Rejuvenation',
     description: 'Platelet-Rich Plasma therapy using your own growth factors to stimulate dormant follicles, increase density, and stop hair thinning.',
     sessions: '4-8 Sessions',
-    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=600&q=80',
+    image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=600&q=80',
     highlights: ['High-density spin tubes', 'Minimal downtime', 'Natural follicular growth']
   },
   {
@@ -78,7 +78,7 @@ const SERVICES_DATA = [
     title: 'Laser Hair Reduction',
     description: 'US-FDA approved diode laser technology for safe, permanent reduction of unwanted hair on face, underarms, or full body.',
     sessions: '6-8 Sessions',
-    image: 'https://images.unsplash.com/photo-1600428877874-5a2423bb0f0c?auto=format&fit=crop&w=600&q=80',
+    image: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=600&q=80',
     highlights: ['Cooling tip technology', 'Pain-free sessions', 'Safe for all Indian skin types']
   },
   {
@@ -93,8 +93,8 @@ const SERVICES_DATA = [
 ];
 
 export default function Services() {
-  const [activeTab, setActiveTab] = useState('All');
-  const categories = ['All', 'Skin', 'Hair', 'Aesthetic'];
+  const [activeTab, setActiveTab] = useState('Skin');
+  const categories = ['Skin', 'Hair', 'Aesthetic', 'All'];
 
   const filteredServices = activeTab === 'All' 
     ? SERVICES_DATA 
@@ -124,7 +124,7 @@ export default function Services() {
               className={`relative px-6 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer ${
                 activeTab === cat
                   ? 'bg-teal-600 text-white shadow-md shadow-teal-600/10'
-                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/50 dark:border-slate-850'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-355 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/50 dark:border-slate-850'
               }`}
             >
               {cat === 'All' ? 'All Treatments' : `${cat} Care`}

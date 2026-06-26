@@ -5,7 +5,6 @@ import { X, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
 // Existing assets
 import lobbyImg from '../assets/clinic_lobby.png';
 import treatmentImg from '../assets/clinic_treatment_room.png';
-import consultationImg from '../assets/patient_consultation.png';
 
 // Real clinic photo assets
 import realExterior1 from '../assets/clinic_real_exterior_1.jpg';
@@ -44,7 +43,7 @@ const IMAGES = [
     description: 'Fully equipped clinical room for FDA-approved laser treatments, PRP, and peel therapies.'
   },
   {
-    src: consultationImg,
+    src: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=800&q=80',
     category: 'interior',
     title: 'Private Consultation Room',
     description: 'Dedicated chamber where Dr. G. Srinivasan conducts private skin, scalp, and hair examinations.'
@@ -157,9 +156,6 @@ export default function Facilities() {
                 </div>
                 <div className="p-6 flex flex-col justify-between flex-grow">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 mb-2 block">
-                      {img.category === 'exterior' ? 'Exterior' : img.category === 'interior' ? 'Interior' : 'Official Info'}
-                    </span>
                     <h3 className="text-base font-extrabold text-slate-900 dark:text-white mb-2 leading-tight">
                       {img.title}
                     </h3>
@@ -237,9 +233,6 @@ export default function Facilities() {
 
                 {/* Meta details */}
                 <div className="mt-6 text-center text-white max-w-xl px-4">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-teal-400 bg-teal-500/10 border border-teal-500/20 px-3 py-1 rounded-full mb-3 inline-block">
-                    {filteredImages[lightboxIndex].category === 'exterior' ? 'Exterior View' : filteredImages[lightboxIndex].category === 'interior' ? 'Clinical Interior' : 'Official Clinic Board'}
-                  </span>
                   <h3 className="text-xl sm:text-2xl font-extrabold mb-2 tracking-tight">
                     {filteredImages[lightboxIndex].title}
                   </h3>

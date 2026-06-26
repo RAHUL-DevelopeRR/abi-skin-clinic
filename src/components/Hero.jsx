@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
 import { Calendar, ArrowRight, ShieldCheck } from 'lucide-react';
 import SplitText from './SplitText';
-import consultationImg from '../assets/patient_consultation.png';
+
+const CLINIC_HERO_BG = 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&w=1200&q=80';
 
 export default function Hero() {
   return (
@@ -9,8 +10,8 @@ export default function Hero() {
       {/* Full-bleed background photo with dark/light responsive overlays */}
       <div className="absolute inset-0 z-0">
         <img 
-          src={consultationImg} 
-          alt="Dermatology Patient Consultation" 
+          src={CLINIC_HERO_BG} 
+          alt="Dermatology Clinic Consultation Room" 
           className="w-full h-full object-cover object-center filter saturate-75"
         />
         {/* Responsive tint overlay to ensure high readability */}

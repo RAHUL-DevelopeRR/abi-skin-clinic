@@ -12,7 +12,7 @@ const BRANCHES = [
       { days: 'Monday - Saturday (Evening)', hours: '4:00 PM - 8:30 PM' },
       { days: 'Sunday', hours: 'Closed' }
     ],
-    mapLink: 'https://maps.app.goo.gl/a23KgqSKFFwrwYf87',
+    mapLink: 'https://www.google.com/maps?cid=15656561799087123579',
     embedLink: 'https://maps.google.com/maps?q=Abi%20Skin%20and%20Hair%20Clinic,%20Madavilagam,%20Karur&t=&z=16&ie=UTF8&iwloc=&output=embed',
     tag: 'Dermatologist available in morning & evening'
   },
@@ -25,7 +25,7 @@ const BRANCHES = [
       { days: 'Monday - Saturday (Evening)', hours: '5:30 PM - 8:30 PM' },
       { days: 'Sunday', hours: 'Closed' }
     ],
-    mapLink: 'https://maps.app.goo.gl/KEHzU8HorETqe6QE6',
+    mapLink: 'https://www.google.com/maps?cid=2613778443127105123',
     embedLink: 'https://maps.google.com/maps?q=Abi%20Skin%20and%20Hair%20Clinic,%20Velayuthampalayam%20Bypass&t=&z=16&ie=UTF8&iwloc=&output=embed',
     tag: 'Convenient evening consultations'
   }
