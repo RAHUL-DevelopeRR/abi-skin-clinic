@@ -31,7 +31,6 @@ export default function Booking() {
   const [isBooked, setIsBooked] = useState(false);
   const [bookingId, setBookingId] = useState('');
 
-  // Available timeslots based on branch hours
   const getTimeSlotsForBranch = () => {
     if (formData.branch === 'Velayuthampalayam') {
       return ['05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM', '08:00 PM'];
@@ -43,13 +42,56 @@ export default function Booking() {
     ];
   };
 
+  const getLocalDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const isTimeSlotPassedToday = (slot) => {
+    if (!formData.date) return false;
+    const todayStr = getLocalDateString();
+    if (formData.date !== todayStr) return false;
+
+    const match = slot.match(/^(\d{2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return false;
+
+    let [_, hoursStr, minutesStr, meridian] = match;
+    let hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+
+    if (meridian.toUpperCase() === 'PM' && hours !== 12) {
+      hours += 12;
+    } else if (meridian.toUpperCase() === 'AM' && hours === 12) {
+      hours = 0;
+    }
+
+    const now = new Date();
+    const currentHours = now.getHours();
+    const currentMinutes = now.getMinutes();
+
+    if (currentHours > hours) {
+      return true;
+    } else if (currentHours === hours && currentMinutes >= minutes) {
+      return true;
+    }
+
+    return false;
+  };
+
   const handleNext = () => {
     const currentErrors = {};
     if (step === 1 && !formData.branch) currentErrors.branch = 'Please select a location';
     if (step === 2 && !formData.service) currentErrors.service = 'Please select a treatment';
     if (step === 3) {
       if (!formData.date) currentErrors.date = 'Please pick a date';
-      if (!formData.timeSlot) currentErrors.timeSlot = 'Please select a time slot';
+      if (!formData.timeSlot) {
+        currentErrors.timeSlot = 'Please select a time slot';
+      } else if (isTimeSlotPassedToday(formData.timeSlot)) {
+        currentErrors.timeSlot = 'This time slot has already passed today';
+      }
     }
     if (step === 4) {
       if (!formData.name.trim()) currentErrors.name = 'Patient name is required';
@@ -266,9 +308,9 @@ Hi Dr. G. Srinivasan, I have submitted an appointment request on the website. Pl
                           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Date</label>
                           <input
                             type="date"
-                            min={new Date().toISOString().split('T')[0]}
+                            min={getLocalDateString()}
                             value={formData.date}
-                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                            onChange={(e) => setFormData({ ...formData, date: e.target.value, timeSlot: '' })}
                             className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 font-semibold text-sm outline-none focus:border-teal-600 text-slate-800 dark:text-slate-200"
                           />
                           {errors.date && <p className="text-red-500 text-xs font-bold mt-1">{errors.date}</p>}
@@ -278,20 +320,26 @@ Hi Dr. G. Srinivasan, I have submitted an appointment request on the website. Pl
                         <div className="space-y-2">
                           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Time Slot</label>
                           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[220px] overflow-y-auto pr-1">
-                            {getTimeSlotsForBranch().map((slot) => (
-                              <button
-                                key={slot}
-                                type="button"
-                                onClick={() => setFormData({ ...formData, timeSlot: slot })}
-                                className={`py-3 px-1 rounded-xl border text-center transition-all text-xs font-bold min-h-[44px] flex items-center justify-center cursor-pointer ${
-                                  formData.timeSlot === slot
-                                    ? 'bg-teal-600 border-teal-600 text-white shadow-md shadow-teal-600/10'
-                                    : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-350'
-                                }`}
-                              >
-                                {slot}
-                              </button>
-                            ))}
+                            {getTimeSlotsForBranch().map((slot) => {
+                              const isPassed = isTimeSlotPassedToday(slot);
+                              return (
+                                <button
+                                  key={slot}
+                                  type="button"
+                                  disabled={isPassed}
+                                  onClick={() => !isPassed && setFormData({ ...formData, timeSlot: slot })}
+                                  className={`py-3 px-1 rounded-xl border text-center transition-all text-xs font-bold min-h-[44px] flex items-center justify-center ${
+                                    isPassed
+                                      ? 'border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/10 text-slate-300 dark:text-slate-700 cursor-not-allowed opacity-40 select-none'
+                                      : formData.timeSlot === slot
+                                        ? 'bg-teal-600 border-teal-600 text-white shadow-md shadow-teal-600/10 cursor-pointer'
+                                        : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-350 cursor-pointer'
+                                  }`}
+                                >
+                                  {isPassed ? '' : slot}
+                                </button>
+                              );
+                            })}
                           </div>
                           {errors.timeSlot && <p className="text-red-500 text-xs font-bold mt-1">{errors.timeSlot}</p>}
                         </div>
