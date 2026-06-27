@@ -8,43 +8,85 @@ import treatmentImg from '../assets/clinic_treatment_room.png';
 
 // Real clinic photo assets
 import realExterior1 from '../assets/clinic_real_exterior_1.jpg';
+import realExterior2 from '../assets/clinic_real_exterior_2.jpg';
 import realSignboard1 from '../assets/clinic_real_signboard_1.jpg';
+import realSignboard2 from '../assets/clinic_real_signboard_2.jpg';
+import realSignboard3 from '../assets/clinic_real_signboard_3.jpg';
+
+// Karur branch photo assets
+import karurBranch1 from '../assets/karur_branch_1.jpg';
+import karurBranch2 from '../assets/karur_branch_2.jpg';
 
 const CATEGORIES = [
   { id: 'all', label: 'All Photos' },
-  { id: 'exterior', label: 'Clinic Exterior' },
-  { id: 'interior', label: 'Interiors & Setup' },
-  { id: 'signboard', label: 'Signboard & Timings' }
+  { id: 'karur', label: 'Karur Branch' },
+  { id: 'velayuthampalayam', label: 'Velayuthampalayam Branch' },
+  { id: 'general', label: 'Image Gallery' }
 ];
 
 const IMAGES = [
+  // Karur Branch
+  {
+    src: karurBranch2,
+    category: 'karur',
+    title: 'Karur Clinic Building Entrance',
+    description: 'Dr. G. Srinivasan\'s main clinic building in Madavilagam, Karur (Timing: 9:00 AM - 2:00 PM).'
+  },
+  {
+    src: karurBranch1,
+    category: 'karur',
+    title: 'ABI Clinic Health Camp',
+    description: 'Free public eye & skin health check-up camp conducted by ABI Clinic team at Karur.'
+  },
+
+  // Velayuthampalayam Branch
   {
     src: realExterior1,
-    category: 'exterior',
-    title: 'Clinic Frontage (Velayuthampalayam Bypass)',
-    description: 'Actual exterior view of ABI Skin & Hair Clinic building, located near Pugali Mandapam.'
+    category: 'velayuthampalayam',
+    title: 'Velayuthampalayam Clinic Frontage',
+    description: 'Actual exterior view of ABI Skin & Hair Clinic building near Pugali Mandapam, Velayuthampalayam.'
+  },
+  {
+    src: realExterior2,
+    category: 'velayuthampalayam',
+    title: 'Velayuthampalayam Gate Entrance',
+    description: 'Side frontage and entrance layout showing clinical parking space at Velayuthampalayam.'
   },
   {
     src: realSignboard1,
-    category: 'signboard',
-    title: 'Dr. G. Srinivasan Board & Consultation Hours',
-    description: 'Our official signboard detailing Dr. Srinivasan G.\'s credentials (MBBS, DD) and consultation timings.'
+    category: 'velayuthampalayam',
+    title: 'Velayuthampalayam Main Signboard',
+    description: 'Official clinical board detailing Dr. Srinivasan G.\'s qualifications (MBBS, DD) and timings.'
   },
   {
+    src: realSignboard2,
+    category: 'velayuthampalayam',
+    title: 'Velayuthampalayam Consulting Room Door',
+    description: 'Entrance signboard indicating consultation timings and credentials.'
+  },
+  {
+    src: realSignboard3,
+    category: 'velayuthampalayam',
+    title: 'Bypass Road Directory Board',
+    description: 'Street-facing signboard placed on Velayuthampalayam Bypass road to guide patients.'
+  },
+
+  // General Image Gallery (No titles/descriptions shown on cards)
+  {
     src: lobbyImg,
-    category: 'interior',
+    category: 'general',
     title: 'Patient Waiting Lounge',
     description: 'Spacious, air-conditioned waiting room designed to provide patient comfort during check-ins.'
   },
   {
     src: treatmentImg,
-    category: 'interior',
+    category: 'general',
     title: 'Advanced Aesthetic Laser Suite',
     description: 'Fully equipped clinical room for FDA-approved laser treatments, PRP, and peel therapies.'
   },
   {
     src: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=800&q=80',
-    category: 'interior',
+    category: 'general',
     title: 'Private Consultation Room',
     description: 'Dedicated chamber where Dr. G. Srinivasan conducts private skin, scalp, and hair examinations.'
   }
@@ -154,16 +196,18 @@ export default function Facilities() {
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/20 to-transparent pointer-events-none" />
                 </div>
-                <div className="p-6 flex flex-col justify-between flex-grow">
-                  <div>
-                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white mb-2 leading-tight">
-                      {img.title}
-                    </h3>
+                {img.category !== 'general' && (
+                  <div className="p-6 flex flex-col justify-between flex-grow">
+                    <div>
+                      <h3 className="text-base font-extrabold text-slate-900 dark:text-white mb-2 leading-tight">
+                        {img.title}
+                      </h3>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold mt-1">
+                      {img.description}
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold mt-1">
-                    {img.description}
-                  </p>
-                </div>
+                )}
               </motion.div>
             ))}
           </AnimatePresence>
@@ -233,12 +277,16 @@ export default function Facilities() {
 
                 {/* Meta details */}
                 <div className="mt-6 text-center text-white max-w-xl px-4">
-                  <h3 className="text-xl sm:text-2xl font-extrabold mb-2 tracking-tight">
-                    {filteredImages[lightboxIndex].title}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-                    {filteredImages[lightboxIndex].description}
-                  </p>
+                  {filteredImages[lightboxIndex].category !== 'general' && (
+                    <>
+                      <h3 className="text-xl sm:text-2xl font-extrabold mb-2 tracking-tight">
+                        {filteredImages[lightboxIndex].title}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
+                        {filteredImages[lightboxIndex].description}
+                      </p>
+                    </>
+                  )}
                   
                   {/* Photo counter / Swipe instruction for mobile */}
                   <div className="mt-4 flex items-center justify-center gap-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
