@@ -7,10 +7,8 @@ import lobbyImg from '../assets/clinic_lobby.png';
 import treatmentImg from '../assets/clinic_treatment_room.png';
 
 // Real clinic photo assets
-import realExterior1 from '../assets/clinic_real_exterior_1.jpg';
 import realExterior2 from '../assets/clinic_real_exterior_2.jpg';
 import realSignboard1 from '../assets/clinic_real_signboard_1.jpg';
-import realSignboard2 from '../assets/clinic_real_signboard_2.jpg';
 import realSignboard3 from '../assets/clinic_real_signboard_3.jpg';
 
 // Karur branch photo assets
@@ -41,12 +39,6 @@ const IMAGES = [
 
   // Velayuthampalayam Branch
   {
-    src: realExterior1,
-    category: 'velayuthampalayam',
-    title: 'Velayuthampalayam Clinic Frontage',
-    description: 'Actual exterior view of ABI Skin & Hair Clinic building near Pugali Mandapam, Velayuthampalayam.'
-  },
-  {
     src: realExterior2,
     category: 'velayuthampalayam',
     title: 'Velayuthampalayam Gate Entrance',
@@ -57,12 +49,6 @@ const IMAGES = [
     category: 'velayuthampalayam',
     title: 'Velayuthampalayam Main Signboard',
     description: 'Official clinical board detailing Dr. Srinivasan G.\'s qualifications (MBBS, DD) and timings.'
-  },
-  {
-    src: realSignboard2,
-    category: 'velayuthampalayam',
-    title: 'Velayuthampalayam Consulting Room Door',
-    description: 'Entrance signboard indicating consultation timings and credentials.'
   },
   {
     src: realSignboard3,
