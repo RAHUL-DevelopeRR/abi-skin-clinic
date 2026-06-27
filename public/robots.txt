@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+# Host & Sitemap
+Host: https://abiskinandhaircare.in
+Sitemap: https://abiskinandhaircare.in/sitemap.xml
