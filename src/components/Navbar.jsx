@@ -37,6 +37,9 @@ export default function Navbar({ darkTheme, setDarkTheme }) {
             <a href="#services" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
               Treatments
             </a>
+            <a href="#education" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+              Patient Education
+            </a>
             <a href="#about" className="font-semibold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
               The Doctor
             </a>
@@ -97,6 +100,13 @@ export default function Navbar({ darkTheme, setDarkTheme }) {
                 className="font-bold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 py-1 transition-colors"
               >
                 Treatments
+              </a>
+              <a 
+                href="#education" 
+                onClick={() => setIsOpen(false)}
+                className="font-bold text-sm text-slate-600 dark:text-slate-350 hover:text-teal-600 dark:hover:text-teal-400 py-1 transition-colors"
+              >
+                Patient Education
               </a>
               <a 
                 href="#about" 
