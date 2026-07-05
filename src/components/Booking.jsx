@@ -143,7 +143,7 @@ export default function Booking() {
 
   const handleWhatsAppSend = () => {
     const phoneNumber = "917598126430"; // Main clinic WhatsApp number
-    const message = `🏥 *ABI Skin & Hair Clinic - Appointment Booking*
+    const message = `🏥 *Dr. Srinivasan's ABI Skin & Hair Clinic - Appointment Booking*
 ----------------------------------------
 🎟️ *Booking ID:* ${bookingId}
 👤 *Patient Name:* ${formData.name}

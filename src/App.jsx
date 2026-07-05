@@ -6,6 +6,7 @@ import Education from './components/Education';
 import About from './components/About';
 import BranchInfo from './components/BranchInfo';
 import Booking from './components/Booking';
+import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import Facilities from './components/Facilities';
 import treatmentImg from './assets/clinic_treatment_room.png';
@@ -73,6 +74,8 @@ function App() {
       <BranchInfo />
       
       <Booking />
+
+      <FAQ />
       
       <Footer />
 

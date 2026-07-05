@@ -12,10 +12,13 @@ export default function Footer() {
             <div className="flex items-center gap-3">
               <ClinicLogo className="w-10 h-12" />
               <div>
+                <span className="block text-[10px] uppercase font-bold tracking-widest text-teal-400">
+                  Dr. Srinivasan's
+                </span>
                 <span className="font-extrabold text-xl tracking-tight text-white">
                   ABI SKIN & HAIR
                 </span>
-                <span className="block text-[10px] uppercase font-bold tracking-widest text-teal-400 -mt-1">
+                <span className="block text-[10px] uppercase font-bold tracking-widest text-slate-500 -mt-1">
                   Care Clinic
                 </span>
               </div>
@@ -61,10 +64,10 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs">
           <div>
-            &copy; {new Date().getFullYear()} ABI Skin & Hair Clinic. All rights reserved.
+            &copy; {new Date().getFullYear()} Dr. Srinivasan's Abi Skin & Hair Clinic. All rights reserved.
           </div>
           <div className="text-slate-500 font-medium text-center md:text-right max-w-md">
-            ABI Skin & Hair Care Clinic is dedicated to offering advanced clinical dermatology, trichology, and non-surgical aesthetic procedures.
+            Dr. Srinivasan's Abi Skin & Hair Care Clinic is dedicated to offering advanced clinical dermatology, trichology, and non-surgical aesthetic procedures.
           </div>
         </div>
 

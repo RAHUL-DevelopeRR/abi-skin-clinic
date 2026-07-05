@@ -116,10 +116,10 @@ export default function Facilities() {
             Clinic Tour
           </span>
           <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white mb-4 tracking-tight">
-            Our Setup & Facilities
+            Our Setups & Clinical Facilities
           </h2>
           <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto font-medium text-sm sm:text-base leading-relaxed">
-            Take a look inside our clean, modern clinical spaces and view our official premises and details. Click on any image to open the high-resolution lightbox viewer.
+            Take a look inside our clean, modern clinical spaces at our Karur and Velayuthampalayam branches. Click on any image to open the high-resolution lightbox viewer.
           </p>
         </div>
 

@@ -106,11 +106,13 @@ export default function Services() {
         
         {/* Header */}
         <div className="text-center mb-16">
-          <span className="text-sm font-extrabold text-teal-600 dark:text-teal-400 uppercase tracking-widest block mb-3">Our Clinical Focus</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 text-xs font-bold uppercase tracking-widest mb-3">
+            Top Skin & Hair Care Clinic in Karur & Velayuthampalayam
+          </div>
           <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white mb-4">
-            Dermatology & Cosmetology
+            Dermatology & Cosmetology Treatments
           </h2>
-          <p className="text-slate-655 dark:text-slate-400 max-w-2xl mx-auto font-medium">
+          <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto font-medium">
             We combine medical-grade clinical science with premium aesthetic technologies to deliver visible, long-term results for your skin and hair.
           </p>
         </div>
