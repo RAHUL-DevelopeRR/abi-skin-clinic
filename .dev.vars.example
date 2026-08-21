@@ -1,0 +1,3 @@
+# Copy this file to .dev.vars for local development.
+# Set the production value as an encrypted Cloudflare Pages secret.
+ADMIN_PASSWORD="replace-with-a-long-unique-password"

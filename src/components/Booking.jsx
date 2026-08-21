@@ -1,501 +1,103 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Calendar, User, Phone, MapPin, Sparkles, CheckCircle2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Calendar, CheckCircle2, LoaderCircle, MapPin, Phone, ShieldCheck, Sparkles, User } from 'lucide-react';
+import { api, formatTime, getLocalDateString, getMaximumBookingDate, getPublicBootstrap } from '../lib/api';
 
-const STEP_TITLES = ['Select Location', 'Choose Treatment', 'Select Date & Time', 'Patient Details'];
-
-const SERVICES = [
-  'Acne & Scar Treatment',
-  'PRP Hair Growth Therapy',
-  'Skin Whitening & Peels',
-  'Hydrafacial & Polishing',
-  'Laser Hair Reduction',
-  'Carbon Laser Toning',
-  'Eczema / Psoriasis Consultation',
-  'Wart & Mole Removal',
-  'General Skin Consultation'
-];
+const EMPTY = { branchId: '', serviceId: '', date: '', timeSlot: '', name: '', phone: '', notes: '', consent: false };
 
 export default function Booking() {
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    branch: '',
-    service: '',
-    date: '',
-    timeSlot: '',
-    name: '',
-    phone: '',
-    notes: ''
-  });
-  const [errors, setErrors] = useState({});
-  const [isBooked, setIsBooked] = useState(false);
-  const [bookingId, setBookingId] = useState('');
+  const [form, setForm] = useState(EMPTY);
+  const [config, setConfig] = useState({ branches: [], services: [] });
+  const [slots, setSlots] = useState([]);
+  const [slotMessage, setSlotMessage] = useState('Choose a branch and date.');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [booking, setBooking] = useState(null);
 
-  const getTimeSlotsForBranch = () => {
-    if (formData.branch === 'Velayuthampalayam') {
-      return ['05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM', '08:00 PM'];
-    }
-    // Karur branch has morning & evening slots
-    return [
-      '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM',
-      '04:30 PM', '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM', '08:00 PM'
-    ];
-  };
+  useEffect(() => {
+    let active = true;
+    getPublicBootstrap().then((data) => active && setConfig(data)).catch((requestError) => active && setError(requestError.message));
+    return () => { active = false; };
+  }, []);
 
-  const getLocalDateString = () => {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const isTimeSlotPassedToday = (slot) => {
-    if (!formData.date) return false;
-    const todayStr = getLocalDateString();
-    if (formData.date !== todayStr) return false;
-
-    const match = slot.match(/^(\d{2}):(\d{2})\s*(AM|PM)$/i);
-    if (!match) return false;
-
-    let [_, hoursStr, minutesStr, meridian] = match;
-    let hours = parseInt(hoursStr, 10);
-    const minutes = parseInt(minutesStr, 10);
-
-    if (meridian.toUpperCase() === 'PM' && hours !== 12) {
-      hours += 12;
-    } else if (meridian.toUpperCase() === 'AM' && hours === 12) {
-      hours = 0;
-    }
-
-    const now = new Date();
-    const currentHours = now.getHours();
-    const currentMinutes = now.getMinutes();
-
-    if (currentHours > hours) {
-      return true;
-    } else if (currentHours === hours && currentMinutes >= minutes) {
-      return true;
-    }
-
-    return false;
-  };
-
-  const handleNext = () => {
-    const currentErrors = {};
-    if (step === 1 && !formData.branch) currentErrors.branch = 'Please select a location';
-    if (step === 2 && !formData.service) currentErrors.service = 'Please select a treatment';
-    if (step === 3) {
-      if (!formData.date) currentErrors.date = 'Please pick a date';
-      if (!formData.timeSlot) {
-        currentErrors.timeSlot = 'Please select a time slot';
-      } else if (isTimeSlotPassedToday(formData.timeSlot)) {
-        currentErrors.timeSlot = 'This time slot has already passed today';
-      }
-    }
-    if (step === 4) {
-      if (!formData.name.trim()) currentErrors.name = 'Patient name is required';
-      if (!formData.phone.trim()) {
-        currentErrors.phone = 'Contact number is required';
-      } else if (!/^\d{10}$/.test(formData.phone.replace(/[\s-+]/g, '').slice(-10))) {
-        currentErrors.phone = 'Please enter a valid 10-digit number';
-      }
-    }
-
-    if (Object.keys(currentErrors).length > 0) {
-      setErrors(currentErrors);
+  useEffect(() => {
+    if (!form.branchId || !form.date) {
+      setSlots([]);
       return;
     }
+    const controller = new AbortController();
+    setLoading(true);
+    api(`/api/public/availability?branch=${encodeURIComponent(form.branchId)}&date=${encodeURIComponent(form.date)}`, { signal: controller.signal })
+      .then((data) => {
+        setSlots(data.slots || []);
+        setSlotMessage(data.slots?.length ? 'Live availability from the clinic calendar.' : (data.reason || 'No slots available.'));
+        setForm((current) => data.slots?.includes(current.timeSlot) ? current : { ...current, timeSlot: '' });
+      })
+      .catch((requestError) => requestError.name !== 'AbortError' && setSlotMessage(requestError.message))
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [form.branchId, form.date]);
 
-    setErrors({});
-    if (step < 4) {
-      setStep(step + 1);
-    } else {
-      // Final Submit
-      const randomId = 'ABI-' + Math.floor(100000 + Math.random() * 900000);
-      setBookingId(randomId);
-      setIsBooked(true);
+  const branch = useMemo(() => config.branches.find((item) => item.id === form.branchId), [config.branches, form.branchId]);
+  const service = useMemo(() => config.services.find((item) => item.id === form.serviceId), [config.services, form.serviceId]);
+
+  async function submit(event) {
+    event.preventDefault();
+    setError('');
+    if (!form.branchId || !form.serviceId || !form.date || !form.timeSlot) return setError('Choose a branch, treatment, date and live time slot.');
+    if (form.name.trim().length < 2) return setError('Enter the patient name.');
+    const digits = form.phone.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
+    if (!/^[6-9]\d{9}$/.test(digits)) return setError('Enter a valid 10-digit Indian mobile number.');
+    if (!form.consent) return setError('Consent is required to process the appointment.');
+    setLoading(true);
+    try {
+      const result = await api('/api/public/appointments', { method: 'POST', body: JSON.stringify(form) });
+      setBooking(result.appointment);
+    } catch (requestError) {
+      setError(requestError.message);
+      if (requestError.code === 'SLOT_UNAVAILABLE') setForm((current) => ({ ...current, timeSlot: '' }));
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
-  const handleBack = () => {
-    if (step > 1) {
-      setStep(step - 1);
-      setErrors({});
-    }
-  };
-
-  const handleReset = () => {
-    setFormData({
-      branch: '',
-      service: '',
-      date: '',
-      timeSlot: '',
-      name: '',
-      phone: '',
-      notes: ''
-    });
-    setStep(1);
-    setIsBooked(false);
-    setBookingId('');
-    setErrors({});
-  };
-
-  const handleWhatsAppSend = () => {
-    const phoneNumber = "917598126430"; // Main clinic WhatsApp number
-    const message = `🏥 *Dr. Srinivasan's ABI Skin & Hair Clinic - Appointment Booking*
-----------------------------------------
-🎟️ *Booking ID:* ${bookingId}
-👤 *Patient Name:* ${formData.name}
-📱 *Phone Number:* ${formData.phone}
-📍 *Clinic Branch:* ${formData.branch} Branch
-🩺 *Treatment:* ${formData.service}
-📅 *Date:* ${formData.date}
-⏰ *Time Slot:* ${formData.timeSlot}
-${formData.notes ? `📝 *Additional Notes:* ${formData.notes}` : ''}
-----------------------------------------
-Hi Dr. G. Srinivasan, I have submitted an appointment request on the website. Please confirm my consultation slot!`;
-    const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
-  };
+  function messageClinic() {
+    const number = String(branch?.phone || '+91 75981 26430').replace(/\D/g, '');
+    const message = `Hello ABI Skin Clinic. Please confirm appointment request ${booking.reference} for ${booking.date} at ${formatTime(booking.timeSlot)}.`;
+    window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+  }
 
   return (
-    <section id="book" className="py-24 px-6 relative overflow-hidden bg-white dark:bg-slate-950">
-      <div className="max-w-3xl mx-auto relative z-10">
-        
-        {/* Title */}
+    <section id="book" className="py-24 px-6 bg-white dark:bg-slate-950">
+      <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
-          <span className="text-sm font-extrabold text-teal-600 dark:text-teal-400 uppercase tracking-widest block mb-3">Scheduling</span>
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white mb-4">
-            Book an Appointment
-          </h2>
-          <p className="text-slate-500 dark:text-slate-400 font-medium">
-            Automated scheduler slots. Select details below to book your consultation with Dr. Srinivasan.
-          </p>
+          <span className="text-sm font-extrabold text-teal-600 uppercase tracking-widest">Live scheduling</span>
+          <h2 className="mt-3 text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white">Request an Appointment</h2>
+          <p className="mt-4 text-slate-500 font-medium">Slots come from the doctor-managed calendar and are protected against double booking.</p>
         </div>
-
-        {/* Wizard Panel */}
-        <div className="rounded-3xl border border-slate-200/60 dark:border-slate-800/80 shadow-xl dark:shadow-slate-950/40 p-6 sm:p-10 bg-slate-50/50 dark:bg-slate-950/20 backdrop-blur-md">
-          
-          {!isBooked ? (
-            <>
-              {/* Progress Steps */}
-              <div className="mb-10 flex items-center justify-between overflow-x-auto pb-4 gap-4">
-                {STEP_TITLES.map((title, i) => {
-                  const stepNum = i + 1;
-                  const isActive = step === stepNum;
-                  const isCompleted = step > stepNum;
-                  
-                  return (
-                    <div key={i} className="flex items-center gap-2 shrink-0">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border transition-all ${
-                        isCompleted
-                          ? 'bg-teal-600 border-teal-600 text-white'
-                          : isActive
-                            ? 'bg-teal-50 dark:bg-teal-950 text-teal-600 dark:text-teal-400 border-teal-600'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400'
-                      }`}>
-                        {isCompleted ? <Check className="w-4 h-4" /> : stepNum}
-                      </div>
-                      <span className={`text-xs font-bold uppercase tracking-wider hidden sm:inline ${
-                        isActive ? 'text-teal-600 dark:text-teal-400' : 'text-slate-400'
-                      }`}>
-                        {title}
-                      </span>
-                    </div>
-                  );
-                })}
+        <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/30 p-6 sm:p-10 shadow-xl">
+          {booking ? (
+            <div className="text-center py-6 space-y-6" aria-live="polite">
+              <CheckCircle2 className="w-16 h-16 mx-auto text-teal-600" />
+              <div><h3 className="text-2xl font-extrabold">Appointment request received</h3><p className="mt-2 text-sm text-slate-500">The clinic will confirm it. This screen does not claim medical confirmation.</p></div>
+              <div className="max-w-md mx-auto text-left rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-6 text-sm space-y-2">
+                <p><strong>Reference:</strong> <span className="text-teal-600">{booking.reference}</span></p><p><strong>Treatment:</strong> {booking.service}</p><p><strong>Date:</strong> {booking.date} at {formatTime(booking.timeSlot)}</p><p><strong>Status:</strong> Awaiting clinic confirmation</p>
               </div>
-
-              {/* Steps Animation wrapper */}
-              <div className="min-h-[250px] mb-8">
-                <AnimatePresence mode="wait">
-                  {step === 1 && (
-                    <motion.div
-                      key="step1"
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: -10, x: -10 }}
-                      className="space-y-6"
-                    >
-                      <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-4">
-                        <MapPin className="w-5 h-5 text-teal-600" />
-                        <span>Where would you like to visit?</span>
-                      </h3>
-                      {errors.branch && <p className="text-red-500 text-xs font-bold">{errors.branch}</p>}
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, branch: 'Karur', timeSlot: '' })}
-                          className={`p-6 rounded-2xl border text-left transition-all ${
-                            formData.branch === 'Karur'
-                              ? 'border-teal-600 bg-teal-50/40 dark:bg-teal-950/20 ring-1 ring-teal-600'
-                              : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900'
-                          }`}
-                        >
-                          <span className="block font-bold text-slate-900 dark:text-white text-base">Karur Branch (Main)</span>
-                          <span className="block text-xs text-slate-500 mt-2 font-semibold">Behind Easwaran Kovil</span>
-                          <span className="block text-xs text-teal-600 dark:text-teal-400 mt-3 font-bold">Consulting hours: Morning & Evening</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, branch: 'Velayuthampalayam', timeSlot: '' })}
-                          className={`p-6 rounded-2xl border text-left transition-all ${
-                            formData.branch === 'Velayuthampalayam'
-                              ? 'border-teal-600 bg-teal-50/40 dark:bg-teal-950/20 ring-1 ring-teal-600'
-                              : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900'
-                          }`}
-                        >
-                          <span className="block font-bold text-slate-900 dark:text-white text-base">Velayuthampalayam Branch</span>
-                          <span className="block text-xs text-slate-500 mt-2 font-semibold">Valluvar Nagar (Near Medicals)</span>
-                          <span className="block text-xs text-teal-600 dark:text-teal-400 mt-3 font-bold">Consulting hours: Evening Only</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {step === 2 && (
-                    <motion.div
-                      key="step2"
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: -10, x: -10 }}
-                      className="space-y-6"
-                    >
-                      <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-4">
-                        <Sparkles className="w-5 h-5 text-teal-600" />
-                        <span>Select the treatment you require</span>
-                      </h3>
-                      {errors.service && <p className="text-red-500 text-xs font-bold">{errors.service}</p>}
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2">
-                        {SERVICES.map((srv) => (
-                          <button
-                            key={srv}
-                            type="button"
-                            onClick={() => setFormData({ ...formData, service: srv })}
-                            className={`p-4 rounded-xl border text-left transition-all text-sm font-semibold ${
-                              formData.service === srv
-                                ? 'border-teal-600 bg-teal-50/40 dark:bg-teal-950/20 text-teal-700 dark:text-teal-450 ring-1 ring-teal-600'
-                                : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300'
-                            }`}
-                          >
-                            {srv}
-                          </button>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {step === 3 && (
-                    <motion.div
-                      key="step3"
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: -10, x: -10 }}
-                      className="space-y-6"
-                    >
-                      <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-4">
-                        <Calendar className="w-5 h-5 text-teal-600" />
-                        <span>Choose appointment date & slot</span>
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Date Picker */}
-                        <div className="space-y-2">
-                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Date</label>
-                          <input
-                            type="date"
-                            min={getLocalDateString()}
-                            value={formData.date}
-                            onChange={(e) => setFormData({ ...formData, date: e.target.value, timeSlot: '' })}
-                            className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 font-semibold text-sm outline-none focus:border-teal-600 text-slate-800 dark:text-slate-200"
-                          />
-                          {errors.date && <p className="text-red-500 text-xs font-bold mt-1">{errors.date}</p>}
-                        </div>
-
-                        {/* Slots */}
-                        <div className="space-y-2">
-                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Time Slot</label>
-                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[220px] overflow-y-auto pr-1">
-                            {getTimeSlotsForBranch().map((slot) => {
-                              const isPassed = isTimeSlotPassedToday(slot);
-                              return (
-                                <button
-                                  key={slot}
-                                  type="button"
-                                  disabled={isPassed}
-                                  onClick={() => !isPassed && setFormData({ ...formData, timeSlot: slot })}
-                                  className={`py-3 px-1 rounded-xl border text-center transition-all text-xs font-bold min-h-[44px] flex items-center justify-center ${
-                                    isPassed
-                                      ? 'border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/10 text-slate-300 dark:text-slate-700 cursor-not-allowed opacity-40 select-none'
-                                      : formData.timeSlot === slot
-                                        ? 'bg-teal-600 border-teal-600 text-white shadow-md shadow-teal-600/10 cursor-pointer'
-                                        : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-350 cursor-pointer'
-                                  }`}
-                                >
-                                  {isPassed ? '' : slot}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {errors.timeSlot && <p className="text-red-500 text-xs font-bold mt-1">{errors.timeSlot}</p>}
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {step === 4 && (
-                    <motion.div
-                      key="step4"
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: -10, x: -10 }}
-                      className="space-y-4"
-                    >
-                      <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-2">
-                        <User className="w-5 h-5 text-teal-600" />
-                        <span>Enter patient information</span>
-                      </h3>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* Name */}
-                        <div className="space-y-1">
-                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Full Name</label>
-                          <input
-                            type="text"
-                            placeholder="John Doe"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 font-semibold text-sm outline-none focus:border-teal-600 text-slate-800 dark:text-slate-200"
-                          />
-                          {errors.name && <p className="text-red-500 text-xs font-bold mt-1">{errors.name}</p>}
-                        </div>
-
-                        {/* Phone */}
-                        <div className="space-y-1">
-                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Contact Number</label>
-                          <input
-                            type="tel"
-                            placeholder="9876543210"
-                            value={formData.phone}
-                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                            className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 font-semibold text-sm outline-none focus:border-teal-600 text-slate-800 dark:text-slate-200"
-                          />
-                          {errors.phone && <p className="text-red-500 text-xs font-bold mt-1">{errors.phone}</p>}
-                        </div>
-                      </div>
-
-                      {/* Notes */}
-                      <div className="space-y-1">
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Additional details (Optional)</label>
-                        <textarea
-                          rows="3"
-                          placeholder="E.g., severity of hair fall, duration of acne, chemical allergies..."
-                          value={formData.notes}
-                          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                          className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-950 font-semibold text-sm outline-none focus:border-teal-600 text-slate-800 dark:text-slate-200"
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-between items-center border-t border-slate-200/50 dark:border-slate-800/40 pt-6">
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  className={`flex items-center gap-1.5 px-5 py-3 rounded-xl text-sm font-bold border transition-colors ${
-                    step === 1
-                      ? 'border-slate-200 text-slate-350 cursor-not-allowed opacity-50 dark:border-slate-800'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-900 cursor-pointer'
-                  }`}
-                  disabled={step === 1}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Back</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold px-6 py-3 rounded-xl shadow-md shadow-teal-600/10 transition-colors text-sm cursor-pointer"
-                >
-                  <span>{step === 4 ? 'Confirm & Book' : 'Continue'}</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </>
+              <div className="flex flex-col sm:flex-row justify-center gap-3"><button onClick={messageClinic} className="inline-flex justify-center items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl font-bold text-sm"><Phone className="w-4 h-4" />Message clinic</button><button onClick={() => { setBooking(null); setForm(EMPTY); }} className="px-6 py-3 rounded-xl bg-slate-200 dark:bg-slate-800 font-bold text-sm">New request</button></div>
+            </div>
           ) : (
-            /* Success State */
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-8 space-y-6"
-            >
-              <div className="w-16 h-16 rounded-full bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 flex items-center justify-center mx-auto shadow-inner border border-teal-200/20">
-                <CheckCircle2 className="w-10 h-10 animate-pulse" />
-              </div>
-              
-              <div>
-                <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">Booking Confirmed!</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">
-                  Your appointment slot has been successfully blocked in our clinic calendar database.
-                </p>
-              </div>
-
-              {/* Receipt Panel */}
-              <div className="max-w-md mx-auto p-6 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800/80 text-left space-y-3 shadow-sm">
-                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-900 pb-3">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Booking ID</span>
-                  <span className="text-sm font-extrabold text-teal-600 dark:text-teal-400">{bookingId}</span>
-                </div>
-                <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <span>Patient Name:</span>
-                  <span className="text-slate-950 dark:text-white">{formData.name}</span>
-                </div>
-                <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <span>Location:</span>
-                  <span className="text-slate-950 dark:text-white">{formData.branch} Branch</span>
-                </div>
-                <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <span>Treatment:</span>
-                  <span className="text-slate-950 dark:text-white text-right max-w-[200px] truncate">{formData.service}</span>
-                </div>
-                <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  <span>Date & Slot:</span>
-                  <span className="text-slate-950 dark:text-white">{formData.date} at {formData.timeSlot}</span>
-                </div>
-              </div>
-
-              <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
-                <button
-                  type="button"
-                  onClick={handleWhatsAppSend}
-                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm transition-colors shadow-md shadow-green-600/15 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <svg className="w-4.5 h-4.5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.97-1.861-1.868-4.333-2.897-6.963-2.899-5.437 0-9.862 4.37-9.866 9.8-.001 1.774.475 3.504 1.378 5.008L1.948 21.53l5.7-.733.001-.001zM17.81 14.54c-.302-.15-1.785-.88-2.062-.98-.277-.1-.478-.15-.679.15-.202.302-.782.98-.958 1.18-.175.2-.351.224-.653.075-1.206-.604-1.997-1.054-2.785-1.74-.788-.686-1.396-1.564-1.597-1.914-.202-.351-.021-.541.13-.692.135-.135.302-.351.453-.528.15-.176.2-.301.302-.503.1-.2.05-.377-.025-.528-.075-.15-.679-1.635-.93-2.237-.245-.588-.493-.508-.679-.518-.175-.01-.377-.01-.579-.01-.202 0-.528.075-.805.378-.277.301-1.057 1.03-1.057 2.512 0 1.482 1.082 2.913 1.232 3.114.15.2 2.13 3.25 5.159 4.561.72.31 1.282.498 1.719.638.723.23 1.382.198 1.902.12.579-.088 1.786-.73 2.038-1.432.252-.703.252-1.307.176-1.433-.075-.125-.277-.201-.579-.352z"/>
-                  </svg>
-                  <span>Confirm on WhatsApp</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="px-6 py-3 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-355 font-bold rounded-xl text-sm transition-colors cursor-pointer"
-                >
-                  Book New Slot
-                </button>
-              </div>
-            </motion.div>
+            <form onSubmit={submit} className="space-y-7">
+              <fieldset><legend className="flex items-center gap-2 font-bold mb-3"><MapPin className="w-5 h-5 text-teal-600" />Clinic location</legend><div className="grid sm:grid-cols-2 gap-3">{config.branches.map((item) => <button key={item.id} type="button" onClick={() => setForm((current) => ({ ...current, branchId: item.id, date: '', timeSlot: '' }))} className={`p-4 rounded-xl border text-left ${form.branchId === item.id ? 'border-teal-600 bg-teal-50 dark:bg-teal-950/30' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950'}`}><strong className="block">{item.name}</strong><span className="block mt-1 text-xs text-slate-500">{item.address}</span></button>)}</div></fieldset>
+              <label className="block"><span className="flex items-center gap-2 font-bold mb-3"><Sparkles className="w-5 h-5 text-teal-600" />Treatment</span><select required value={form.serviceId} onChange={(event) => setForm((current) => ({ ...current, serviceId: event.target.value }))} className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950"><option value="">Select a treatment</option>{config.services.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+              <div className="grid md:grid-cols-2 gap-5"><label className="block"><span className="flex items-center gap-2 font-bold mb-3"><Calendar className="w-5 h-5 text-teal-600" />Date</span><input required type="date" min={getLocalDateString()} max={getMaximumBookingDate()} value={form.date} onChange={(event) => setForm((current) => ({ ...current, date: event.target.value, timeSlot: '' }))} className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950" /></label><div><span className="block font-bold mb-3">Available time</span><div className="grid grid-cols-3 gap-2">{slots.map((slot) => <button key={slot} type="button" onClick={() => setForm((current) => ({ ...current, timeSlot: slot }))} className={`min-h-11 rounded-xl border text-xs font-bold ${form.timeSlot === slot ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800'}`}>{formatTime(slot)}</button>)}</div><p className="mt-2 text-xs text-slate-500" aria-live="polite">{loading ? 'Loading live slots…' : slotMessage}</p></div></div>
+              <div className="grid sm:grid-cols-2 gap-4"><label className="block"><span className="flex items-center gap-2 text-sm font-bold mb-2"><User className="w-4 h-4" />Patient name</span><input required autoComplete="name" maxLength="100" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950" /></label><label className="block"><span className="flex items-center gap-2 text-sm font-bold mb-2"><Phone className="w-4 h-4" />Mobile</span><input required autoComplete="tel" inputMode="numeric" maxLength="14" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950" /></label></div>
+              <label className="block text-sm font-bold">Brief note (optional)<textarea maxLength="500" rows="3" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Avoid sensitive details; discuss these privately with the doctor." className="mt-2 w-full p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 resize-none" /></label>
+              <label className="flex gap-3 text-xs text-slate-600 dark:text-slate-300"><input type="checkbox" checked={form.consent} onChange={(event) => setForm((current) => ({ ...current, consent: event.target.checked }))} /><span>I consent to the clinic storing these details for appointment management and contacting me by phone or WhatsApp.</span></label>
+              {branch && service && form.date && form.timeSlot && <p className="rounded-xl bg-white dark:bg-slate-950 p-4 text-xs border border-slate-200 dark:border-slate-800"><strong>{branch.name}</strong> · {service.name} · {form.date} at {formatTime(form.timeSlot)}</p>}
+              {error && <p role="alert" className="flex items-center gap-2 text-sm text-red-600"><AlertCircle className="w-4 h-4" />{error}</p>}
+              <button disabled={loading} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-7 py-3.5 rounded-xl font-bold disabled:opacity-50">{loading ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}Store appointment request</button>
+            </form>
           )}
-
         </div>
-
       </div>
     </section>
   );
