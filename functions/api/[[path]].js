@@ -61,6 +61,9 @@ async function createAppointment(context) {
   const patientName = text(body.name, 'Patient name', { min: 2, max: 100 });
   const phone = validatePhone(body.phone);
   const notes = text(body.notes, 'Notes', { max: 500, optional: true });
+  if (body.consent !== true) {
+    throw new ApiError(400, 'CONSENT_REQUIRED', 'Consent is required to store an appointment request.');
+  }
 
   const service = await DB
     .prepare('SELECT id, name FROM services WHERE id = ? AND active = 1')
@@ -248,7 +251,13 @@ async function listAppointments(db, request) {
     ORDER BY a.appointment_date DESC, a.time_slot DESC
     LIMIT 200
   `).bind(...params).all();
-  return result.results || [];
+  const origin = new URL(request.url).origin;
+  return (result.results || []).map((appointment) => ({
+    ...appointment,
+    review_url: appointment.review_token
+      ? `${origin}/?review=${appointment.review_token}#reviews`
+      : null,
+  }));
 }
 
 async function updateAppointment(context, appointmentId) {
@@ -323,7 +332,7 @@ function validateSchedulePeriods(rawPeriods) {
   }
 
   const normalized = [];
-  for (const [dayOfWeek, periods] of byDay) {
+  for (const periods of byDay.values()) {
     periods.sort((left, right) => left.startTime.localeCompare(right.startTime));
     for (let index = 0; index < periods.length; index += 1) {
       if (index > 0 && timeToMinutes(periods[index].startTime) < timeToMinutes(periods[index - 1].endTime)) {
@@ -407,6 +416,147 @@ async function listReviews(db, request) {
   return result.results || [];
 }
 
+async function checkAppointmentStatus(context) {
+  const { DB } = context.env;
+  await enforceRateLimit(DB, context.request, 'appointment-status', 15, 10 * 60);
+  const url = new URL(context.request.url);
+  const rawReference = url.searchParams.get('reference');
+  const rawPhone = url.searchParams.get('phone');
+  if (!rawReference || !rawPhone) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Reference number and registered mobile number are required.');
+  }
+  const reference = text(rawReference.trim().toUpperCase(), 'Reference number', { min: 4, max: 40 });
+  const phone = validatePhone(rawPhone);
+
+  const appointment = await DB.prepare(`
+    SELECT a.id, a.reference, a.appointment_date, a.time_slot, a.patient_name,
+           a.status, a.notes, a.admin_notes, a.review_token, a.created_at,
+           b.name AS branch_name, b.phone AS branch_phone, b.address AS branch_address,
+           s.name AS service_name
+    FROM appointments a
+    JOIN branches b ON b.id = a.branch_id
+    JOIN services s ON s.id = a.service_id
+    WHERE a.reference = ? AND a.phone = ?
+  `).bind(reference, phone).first();
+
+  if (!appointment) {
+    throw new ApiError(404, 'APPOINTMENT_NOT_FOUND', 'No appointment found matching this reference and mobile number.');
+  }
+
+  return json({
+    appointment: {
+      reference: appointment.reference,
+      date: appointment.appointment_date,
+      timeSlot: appointment.time_slot,
+      patientName: appointment.patient_name,
+      status: appointment.status,
+      branchName: appointment.branch_name,
+      branchPhone: appointment.branch_phone,
+      branchAddress: appointment.branch_address,
+      serviceName: appointment.service_name,
+      notes: appointment.notes,
+      adminNotes: appointment.admin_notes,
+      reviewToken: appointment.status === 'completed' ? appointment.review_token : null,
+      createdAt: appointment.created_at,
+    },
+  });
+}
+
+async function getSettings(db) {
+  const result = await db.prepare('SELECT key, value, updated_at FROM settings').all();
+  const settings = {};
+  for (const row of result.results || []) {
+    settings[row.key] = row.value;
+  }
+  return settings;
+}
+
+async function updateSettings(context) {
+  const { DB } = context.env;
+  const body = await readJson(context.request);
+  const statements = [];
+  const changes = {};
+
+  if (body.bookingHorizonDays !== undefined) {
+    const horizon = integer(body.bookingHorizonDays, 'Booking horizon days', { min: 1, max: 365 });
+    statements.push(DB.prepare("UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = 'booking_horizon_days'").bind(String(horizon)));
+    changes.bookingHorizonDays = horizon;
+  }
+  if (body.minimumNoticeMinutes !== undefined) {
+    const notice = integer(body.minimumNoticeMinutes, 'Minimum booking notice minutes', { min: 0, max: 1440 });
+    statements.push(DB.prepare("UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = 'minimum_booking_notice_minutes'").bind(String(notice)));
+    changes.minimumNoticeMinutes = notice;
+  }
+  if (body.clinicTimezone !== undefined) {
+    const tz = text(body.clinicTimezone, 'Clinic timezone', { min: 3, max: 50 });
+    statements.push(DB.prepare("UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = 'clinic_timezone'").bind(tz));
+    changes.clinicTimezone = tz;
+  }
+
+  if (statements.length) {
+    await DB.batch(statements);
+    await writeAudit(DB, 'settings.updated', 'settings', null, changes);
+  }
+  return getSettings(DB);
+}
+
+async function createService(context) {
+  const body = await readJson(context.request);
+  const serviceId = validateId(body.id, 'Service ID');
+  const serviceName = text(body.name, 'Service Name', { min: 2, max: 100 });
+  const sortOrder = integer(body.sortOrder ?? 0, 'Sort Order', { min: 0, max: 999 });
+
+  const existing = await context.env.DB.prepare('SELECT id FROM services WHERE id = ?').bind(serviceId).first();
+  if (existing) {
+    throw new ApiError(409, 'SERVICE_EXISTS', 'A service with this ID already exists.');
+  }
+
+  await context.env.DB.prepare(`
+    INSERT INTO services (id, name, sort_order, active) VALUES (?, ?, ?, 1)
+  `).bind(serviceId, serviceName, sortOrder).run();
+
+  await writeAudit(context.env.DB, 'service.created', 'service', serviceId, { name: serviceName, sortOrder });
+  return json({ id: serviceId, name: serviceName, sort_order: sortOrder, active: 1 }, 201);
+}
+
+async function exportAppointments(db, request) {
+  const appointments = await listAppointments(db, request);
+  const escapeCsv = (val) => {
+    if (val === null || val === undefined) return '""';
+    const str = String(val).replace(/"/g, '""');
+    return `"${str}"`;
+  };
+
+  const headers = ['Reference', 'Date', 'Time Slot', 'Patient Name', 'Phone', 'Branch', 'Service', 'Status', 'Notes', 'Admin Notes', 'Created At'];
+  const rows = [headers.join(',')];
+
+  for (const app of appointments) {
+    rows.push([
+      escapeCsv(app.reference),
+      escapeCsv(app.appointment_date),
+      escapeCsv(app.time_slot),
+      escapeCsv(app.patient_name),
+      escapeCsv(app.phone),
+      escapeCsv(app.branch_name),
+      escapeCsv(app.service_name),
+      escapeCsv(app.status),
+      escapeCsv(app.notes),
+      escapeCsv(app.admin_notes),
+      escapeCsv(app.created_at),
+    ].join(','));
+  }
+
+  const csvContent = rows.join('\r\n');
+  return new Response(csvContent, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="abi_clinic_appointments_${new Date().toISOString().slice(0, 10)}.csv"`,
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
 async function routePublic(context, path) {
   const method = context.request.method;
   if (path === 'public/bootstrap' && method === 'GET') {
@@ -423,6 +573,9 @@ async function routePublic(context, path) {
   if (path === 'public/appointments') {
     return method === 'POST' ? createAppointment(context) : methodNotAllowed(['POST']);
   }
+  if (path === 'public/appointments/status' && method === 'GET') {
+    return checkAppointmentStatus(context);
+  }
   if (path === 'public/reviews') {
     return method === 'POST' ? submitReview(context) : methodNotAllowed(['POST']);
   }
@@ -435,11 +588,19 @@ async function routeAdmin(context, path) {
   if (path === 'admin/login') {
     return method === 'POST' ? login(context) : methodNotAllowed(['POST']);
   }
+  if (path === 'admin/session' && method === 'GET') {
+    try {
+      await requireAdmin(DB, context.request);
+      return json({ authenticated: true });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) return json({ authenticated: false });
+      throw error;
+    }
+  }
 
   await requireAdmin(DB, context.request);
   if (isMutation(method)) requireSameOrigin(context.request);
 
-  if (path === 'admin/session' && method === 'GET') return json({ authenticated: true });
   if (path === 'admin/logout') {
     if (method !== 'POST') return methodNotAllowed(['POST']);
     await destroySession(DB, context.request);
@@ -447,6 +608,7 @@ async function routeAdmin(context, path) {
   }
   if (path === 'admin/dashboard' && method === 'GET') return json(await dashboard(DB));
   if (path === 'admin/appointments' && method === 'GET') return json({ appointments: await listAppointments(DB, context.request) });
+  if (path === 'admin/appointments/export' && method === 'GET') return exportAppointments(DB, context.request);
 
   const appointmentMatch = path.match(/^admin\/appointments\/([a-zA-Z0-9-]+)$/);
   if (appointmentMatch) {
@@ -504,19 +666,45 @@ async function routeAdmin(context, path) {
     return methodNotAllowed(['PATCH', 'DELETE']);
   }
 
+  if (path === 'admin/services') {
+    if (method === 'POST') return createService(context);
+    return methodNotAllowed(['POST']);
+  }
   const serviceMatch = path.match(/^admin\/services\/([a-zA-Z0-9_-]+)$/);
   if (serviceMatch) {
     if (method !== 'PATCH') return methodNotAllowed(['PATCH']);
     const body = await readJson(context.request);
-    if (typeof body.active !== 'boolean') {
-      throw new ApiError(400, 'VALIDATION_ERROR', 'Service active state must be true or false.');
+    const updates = [];
+    const params = [];
+    if (typeof body.active === 'boolean') {
+      updates.push('active = ?');
+      params.push(body.active ? 1 : 0);
     }
+    if (body.name) {
+      updates.push('name = ?');
+      params.push(text(body.name, 'Service name', { min: 2, max: 100 }));
+    }
+    if (body.sortOrder !== undefined) {
+      updates.push('sort_order = ?');
+      params.push(integer(body.sortOrder, 'Sort order', { min: 0, max: 999 }));
+    }
+    if (!updates.length) {
+      throw new ApiError(400, 'VALIDATION_ERROR', 'No valid fields to update.');
+    }
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(serviceMatch[1]);
     const result = await DB.prepare(`
-      UPDATE services SET active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-    `).bind(body.active ? 1 : 0, serviceMatch[1]).run();
+      UPDATE services SET ${updates.join(', ')} WHERE id = ?
+    `).bind(...params).run();
     if (!result.meta.changes) throw new ApiError(404, 'SERVICE_NOT_FOUND', 'Service was not found.');
-    await writeAudit(DB, 'service.updated', 'service', serviceMatch[1], { active: body.active });
+    await writeAudit(DB, 'service.updated', 'service', serviceMatch[1], body);
     return json({ updated: true });
+  }
+
+  if (path === 'admin/settings') {
+    if (method === 'GET') return json({ settings: await getSettings(DB) });
+    if (method === 'PATCH') return json({ settings: await updateSettings(context) });
+    return methodNotAllowed(['GET', 'PATCH']);
   }
 
   return null;
@@ -524,6 +712,18 @@ async function routeAdmin(context, path) {
 
 export async function onRequest(context) {
   try {
+    if (context.request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Allow': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      });
+    }
+
     if (!context.env.DB) {
       throw new ApiError(503, 'DATABASE_NOT_CONFIGURED', 'Database binding is not configured.');
     }

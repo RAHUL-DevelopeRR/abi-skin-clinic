@@ -28,7 +28,7 @@ export default function Hero() {
           className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/20 text-xs font-bold uppercase tracking-wider mb-8"
         >
           <ShieldCheck className="w-4 h-4" />
-          <span>Over 20 Years of Skin & Hair Clinical Excellence</span>
+          <span>Consultant-led Skin & Hair Care</span>
         </motion.div>
 
         {/* Headline */}
@@ -50,7 +50,7 @@ export default function Hero() {
           <span className="font-bold text-slate-800 dark:text-slate-100 border-b-2 border-teal-500/30">
             Dr. Srinivasan G. (MBBS, DD)
           </span>{' '}
-          with over 16 years of certified medical experience.
+          for diagnosis-led skin and hair care.
         </motion.p>
 
         {/* Buttons */}
@@ -84,16 +84,16 @@ export default function Hero() {
           className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 w-full max-w-4xl py-8 border-t border-slate-300/40 dark:border-slate-800/40"
         >
           <div>
-            <span className="block text-3xl font-extrabold text-slate-950 dark:text-white">20+ Yrs</span>
-            <span className="block text-xs font-bold text-slate-455 dark:text-slate-400 mt-1 uppercase tracking-wider">Local Presence</span>
+            <span className="block text-3xl font-extrabold text-slate-950 dark:text-white">Doctor-led</span>
+            <span className="block text-xs font-bold text-slate-455 dark:text-slate-400 mt-1 uppercase tracking-wider">Clinical Care</span>
           </div>
           <div>
-            <span className="block text-3xl font-extrabold text-slate-950 dark:text-white">15k+</span>
-            <span className="block text-xs font-bold text-slate-455 dark:text-slate-400 mt-1 uppercase tracking-wider">Happy Patients</span>
+            <span className="block text-3xl font-extrabold text-slate-950 dark:text-white">Live</span>
+            <span className="block text-xs font-bold text-slate-455 dark:text-slate-400 mt-1 uppercase tracking-wider">Appointment Slots</span>
           </div>
           <div>
-            <span className="block text-3xl font-extrabold text-slate-950 dark:text-white">4.8★</span>
-            <span className="block text-xs font-bold text-slate-455 dark:text-slate-400 mt-1 uppercase tracking-wider">Google Rating</span>
+            <span className="block text-3xl font-extrabold text-slate-950 dark:text-white">Verified</span>
+            <span className="block text-xs font-bold text-slate-455 dark:text-slate-400 mt-1 uppercase tracking-wider">Patient Reviews</span>
           </div>
           <div>
             <span className="block text-3xl font-extrabold text-slate-950 dark:text-white">2</span>

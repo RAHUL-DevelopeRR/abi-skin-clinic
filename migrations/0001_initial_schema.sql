@@ -133,30 +133,44 @@ INSERT OR IGNORE INTO branches (id, name, address, phone) VALUES
   ('velayuthampalayam', 'Velayuthampalayam Clinic', 'Valluvar Nagar, South 1st Street, Velayuthampalayam Bypass, Near Pugali Mandapam, Velayuthampalayam - 639117', '+91 94437 66998');
 
 INSERT OR IGNORE INTO services (id, name, sort_order) VALUES
-  ('acne-scar', 'Acne & Scar Treatment', 10),
-  ('prp-hair', 'PRP Hair Growth Therapy', 20),
-  ('pigmentation-peels', 'Pigmentation & Clinical Peels', 30),
-  ('hydrafacial', 'Hydrafacial & Skin Polishing', 40),
-  ('laser-hair', 'Laser Hair Reduction', 50),
-  ('carbon-laser', 'Carbon Laser Toning', 60),
-  ('eczema-psoriasis', 'Eczema / Psoriasis Consultation', 70),
-  ('wart-mole', 'Wart & Mole Removal', 80),
-  ('general', 'General Skin Consultation', 90);
+  ('unwanted-hair', 'Unwanted Hair Removal', 10),
+  ('acne-scar', 'Acne & Acne Scar Treatment', 20),
+  ('pigmentation-laser', 'Acne Pigmentation & Pigmentation Lasers', 30),
+  ('facial-warts-laser', 'Facial Wart Laser Treatment', 40),
+  ('cryotherapy', 'Liquid Nitrogen Cryotherapy', 50),
+  ('tattoo-removal', 'Laser Tattoo Removal', 60),
+  ('psoriasis', 'Psoriasis Treatment', 70),
+  ('vitiligo', 'Vitiligo Treatment', 80),
+  ('hair-loss-alopecia', 'Hair Loss & Alopecia Treatment', 90),
+  ('urticaria', 'Urticaria Treatment', 100),
+  ('lichen-planus', 'Lichen Planus Treatment', 110),
+  ('eczema', 'Eczema Treatment', 120),
+  ('fungal-ringworm', 'Fungal Infection (Ringworm)', 130),
+  ('nail-disease', 'Nail Disease & Nail Fungus', 140),
+  ('ipl-skin-glow', 'IPL Laser & Skin Glow', 150),
+  ('general', 'General Skin Consultation', 160);
 
 INSERT OR IGNORE INTO working_hours
   (branch_id, day_of_week, period_index, start_time, end_time, slot_minutes)
-SELECT 'karur', day, 0, '09:00', '13:00', 30
-FROM (SELECT 1 AS day UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6);
-
-INSERT OR IGNORE INTO working_hours
-  (branch_id, day_of_week, period_index, start_time, end_time, slot_minutes)
-SELECT 'karur', day, 1, '16:00', '20:30', 30
-FROM (SELECT 1 AS day UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6);
-
-INSERT OR IGNORE INTO working_hours
-  (branch_id, day_of_week, period_index, start_time, end_time, slot_minutes)
-SELECT 'velayuthampalayam', day, 0, '17:30', '20:30', 30
-FROM (SELECT 1 AS day UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6);
+VALUES
+  ('karur', 1, 0, '09:00', '13:00', 30),
+  ('karur', 2, 0, '09:00', '13:00', 30),
+  ('karur', 3, 0, '09:00', '13:00', 30),
+  ('karur', 4, 0, '09:00', '13:00', 30),
+  ('karur', 5, 0, '09:00', '13:00', 30),
+  ('karur', 6, 0, '09:00', '13:00', 30),
+  ('karur', 1, 1, '16:00', '20:30', 30),
+  ('karur', 2, 1, '16:00', '20:30', 30),
+  ('karur', 3, 1, '16:00', '20:30', 30),
+  ('karur', 4, 1, '16:00', '20:30', 30),
+  ('karur', 5, 1, '16:00', '20:30', 30),
+  ('karur', 6, 1, '16:00', '20:30', 30),
+  ('velayuthampalayam', 1, 0, '17:30', '20:30', 30),
+  ('velayuthampalayam', 2, 0, '17:30', '20:30', 30),
+  ('velayuthampalayam', 3, 0, '17:30', '20:30', 30),
+  ('velayuthampalayam', 4, 0, '17:30', '20:30', 30),
+  ('velayuthampalayam', 5, 0, '17:30', '20:30', 30),
+  ('velayuthampalayam', 6, 0, '17:30', '20:30', 30);
 
 INSERT OR IGNORE INTO settings (key, value) VALUES
   ('booking_horizon_days', '90'),

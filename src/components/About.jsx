@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { Award, BookOpen, HeartHandshake, ShieldCheck } from 'lucide-react';
 import TiltedCard from './TiltedCard';
 import doctorImg from '../assets/dr_srinivasan_real.png';
@@ -35,7 +34,7 @@ export default function About() {
               Dedicated to Skin Health & Aesthetic Excellence
             </h2>
             <p className="text-base text-slate-600 dark:text-slate-300 font-medium leading-relaxed mb-8">
-              Dr. Srinivasan G. is a highly trusted dermatologist and trichologist in the Karur and Velayuthampalayam region. With over 16 years of clinical practice, he specializes in treating complex dermatological conditions, custom hair restoration protocols, and advanced non-surgical facial aesthetics.
+              Dr. Srinivasan G. provides dermatology and hair consultations in Karur and Velayuthampalayam. His clinical work includes common and chronic skin conditions, hair loss, and suitable doctor-supervised laser and aesthetic procedures.
             </p>
 
             {/* Grid of Credentials */}
@@ -59,7 +58,7 @@ export default function About() {
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Qualifications</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">MBBS, DD (Diploma in Dermatology) from premium medical institutes.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">MBBS, DD (Diploma in Dermatology).</p>
                 </div>
               </div>
 
@@ -69,8 +68,8 @@ export default function About() {
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Professional Member</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Active registered member of the national IADVL organization.</p>
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Clinical Focus</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Medical dermatology, hair disorders, laser and IPL procedures.</p>
                 </div>
               </div>
 
@@ -81,7 +80,7 @@ export default function About() {
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Patient-Centric Care</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Personalized diagnostic approaches ensuring safe, customized treatments.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Individual assessment, treatment planning and follow-up care.</p>
                 </div>
               </div>
 

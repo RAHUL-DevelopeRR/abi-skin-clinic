@@ -12,7 +12,7 @@ const faqs = [
   },
   {
     question: "What treatments are available for active hair fall and thinning?",
-    answer: "We offer advanced, scientifically backed trichology treatments including Platelet-Rich Plasma (PRP) therapy, hair growth microneedling, medical scalp treatments, and customized hair growth cycles targeting both male and female pattern baldness."
+    answer: "We evaluate hair loss and alopecia to identify likely causes, then create an appropriate medical treatment and follow-up plan for each patient."
   },
   {
     question: "Do I need a prior appointment to consult the doctor?",
@@ -20,7 +20,7 @@ const faqs = [
   },
   {
     question: "Are the aesthetic laser treatments safe?",
-    answer: "Absolutely. All aesthetic and skin procedures are performed using US-FDA approved laser technologies under strict clinical guidelines and direct supervision of Dr. G. Srinivasan to guarantee safety, precision, and maximum clinical efficacy."
+    answer: "Laser and IPL procedures are performed under Dr. G. Srinivasan's supervision after a suitability assessment. Benefits, risks, alternatives and aftercare are explained before treatment."
   }
 ];
 

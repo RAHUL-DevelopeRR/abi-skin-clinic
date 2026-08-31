@@ -2,17 +2,21 @@ import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Services from './components/Services';
-import Education from './components/Education';
 import About from './components/About';
+import Facilities from './components/Facilities';
 import BranchInfo from './components/BranchInfo';
 import Booking from './components/Booking';
+import Reviews from './components/Reviews';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
-import Facilities from './components/Facilities';
+import AppointmentLookup from './components/AppointmentLookup';
+import AdminDashboard from './components/AdminDashboard';
 import treatmentImg from './assets/clinic_treatment_room.png';
 
 function App() {
   const [darkTheme, setDarkTheme] = useState(false);
+  const [showLookup, setShowLookup] = useState(() => window.location.hash === '#track');
+  const isAdminRoute = window.location.pathname.startsWith('/admin');
 
   // Apply theme class to document element
   useEffect(() => {
@@ -23,21 +27,22 @@ function App() {
     }
   }, [darkTheme]);
 
+  if (isAdminRoute) return <AdminDashboard />;
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-300">
       
       {/* Header / Navbar */}
       <Navbar 
         darkTheme={darkTheme} 
-        setDarkTheme={setDarkTheme} 
+        setDarkTheme={setDarkTheme}
+        onOpenLookup={() => setShowLookup(true)}
       />
 
       {/* Main Website Sections */}
-      <Hero />
+      <Hero onOpenLookup={() => setShowLookup(true)} />
       
       <Services />
-      
-      <Education />
       
       <About />
 
@@ -55,18 +60,24 @@ function App() {
         </div>
         <div className="max-w-3xl mx-auto relative z-10 space-y-6">
           <h3 className="text-3xl sm:text-4xl font-extrabold text-white">
-            Experience the Highest Standard of Clinical Care
+            Doctor-led Clinical Care
           </h3>
           <p className="text-slate-300 text-sm sm:text-base font-semibold leading-relaxed max-w-xl mx-auto">
-            Equipped with FDA-approved laser technologies, advanced clinical facilities, and personal medical attention from Dr. G. Srinivasan.
+            Modern clinical facilities and personal medical attention from Dr. G. Srinivasan. Treatment suitability is decided after consultation.
           </p>
-          <div className="pt-2">
+          <div className="pt-2 flex flex-wrap justify-center gap-3">
             <a 
               href="#book" 
               className="inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-md shadow-teal-600/10 hover:shadow-teal-600/20 text-sm cursor-pointer"
             >
               Schedule Your Consultation
             </a>
+            <button
+              onClick={() => setShowLookup(true)}
+              className="inline-flex items-center gap-1.5 bg-slate-900/80 hover:bg-slate-900 border border-slate-700 text-white px-6 py-4 rounded-2xl font-bold transition-all text-sm cursor-pointer"
+            >
+              Track Appointment Status
+            </button>
           </div>
         </div>
       </section>
@@ -75,9 +86,20 @@ function App() {
       
       <Booking />
 
+      {/* Patient Reviews Section */}
+      <Reviews />
+
       <FAQ />
       
-      <Footer />
+      <Footer
+        onOpenLookup={() => setShowLookup(true)}
+      />
+
+      {/* Modals */}
+      <AppointmentLookup
+        isOpen={showLookup}
+        onClose={() => setShowLookup(false)}
+      />
 
     </div>
   );

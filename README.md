@@ -1,16 +1,47 @@
-# React + Vite
+# ABI Skin & Hair Clinic
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Clinic website and appointment operations system built with React, Cloudflare Pages Functions, and Cloudflare D1.
 
-Currently, two official plugins are available:
+## What is real
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Appointment requests are stored in D1 and use a database uniqueness rule to prevent double booking.
+- Availability is generated from doctor-managed weekly hours, leave days, occupied slots, booking horizon, and notice time.
+- `/admin` is password protected and lets clinic staff manage appointment statuses, working days and periods, leave days, services, and review moderation.
+- A completed appointment receives a one-time review token. Only approved reviews are public.
+- Patient appointment status can be checked with the booking reference and registered phone number.
 
-## React Compiler
+## Local development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Requirements: Node.js 20+ and npm.
 
-## Expanding the ESLint configuration
+```bash
+npm ci
+copy .dev.vars.example .dev.vars
+npm run d1:migrate:local
+npm run build
+npm run pages:dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Open the local URL printed by Wrangler. The public site is at `/` and the doctor dashboard is at `/admin`.
+
+## Production setup
+
+The GitHub workflow deploys the Pages project and applies D1 migrations. Configure these repository secrets:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `ADMIN_PASSWORD` (at least 12 characters; use a long unique value)
+
+The D1 binding is named `DB`. Wrangler can provision `abi-skin-clinic-db` from `wrangler.jsonc` during the first deployment. Confirm the generated database binding and migration step in the first workflow run.
+
+## Checks
+
+```bash
+npm run check
+```
+
+This runs linting, scheduling unit tests, and the production build.
+
+## Data and privacy
+
+Appointments, review invitations, approved/pending reviews, sessions, clinic schedules, leave days, and audit events are stored in Cloudflare D1. No patient images are collected. See `public/privacy.html` for the patient-facing notice.

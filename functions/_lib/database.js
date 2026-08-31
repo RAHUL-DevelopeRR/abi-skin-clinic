@@ -4,7 +4,7 @@ import { hashText } from './auth.js';
 export async function enforceRateLimit(db, request, scope, limit, windowSeconds) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   const ipHash = await hashText(ip);
-  const windowStart = Math.floor(Date.now() / (windowSeconds * 1000));
+  const windowStart = Math.floor(Date.now() / 1000 / windowSeconds) * windowSeconds;
   const bucket = `${scope}:${ipHash}`;
   const row = await db.prepare(`
     INSERT INTO rate_limits (bucket, window_start, count)

@@ -14,8 +14,10 @@
   --color-teal-200: #fbcfe8;
   --color-teal-300: #f9a8d4;
   --color-teal-400: #f472b6;
+  --color-teal-450: #f05aaf;
   --color-teal-500: #ec4899;
   --color-teal-600: #db2777; /* Deep Hot Pink / Magenta */
+  --color-teal-650: #cc2070;
   --color-teal-700: #be185d;
   --color-teal-800: #9d174d;
   --color-teal-900: #831843;
@@ -26,11 +28,14 @@
   --color-slate-100: #eef2ff;
   --color-slate-200: #e0e7ff;
   --color-slate-300: #c7d2fe;
+  --color-slate-350: #a5b4fc;
   --color-slate-400: #818cf8;
   --color-slate-500: #4f46e5;
   --color-slate-600: #3f51b5;
+  --color-slate-650: #30458c;
   --color-slate-750: #1b2d5d;
   --color-slate-800: #15244c;
+  --color-slate-850: #121f45;
   --color-slate-900: #0f1c3f; /* Deep Royal Navy Blue */
   --color-slate-950: #080f24; /* Black-Blue background */
 }

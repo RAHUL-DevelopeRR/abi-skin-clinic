@@ -1,9 +1,9 @@
-import { Sparkles, HeartPulse, ExternalLink } from 'lucide-react';
+import { Lock, Search } from 'lucide-react';
 import ClinicLogo from './ClinicLogo';
 
-export default function Footer() {
+export default function Footer({ onOpenLookup }) {
   return (
-    <footer className="py-16 px-6 bg-slate-900 text-slate-400 border-t border-slate-850 relative z-10">
+    <footer className="py-16 px-6 bg-slate-900 text-slate-400 border-t border-slate-800 relative z-10">
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-12 mb-12">
           
@@ -24,8 +24,24 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-sm text-slate-400 max-w-sm leading-relaxed font-medium">
-              Top 1% clinical skin and hair wellness services in Karur and Velayuthampalayam. Under the expert medical guidance of Dr. Srinivasan G. (16+ years experience).
+              Doctor-led skin and hair care in Karur and Velayuthampalayam, with treatment selected after an individual clinical consultation.
             </p>
+            <div className="pt-2 flex flex-wrap gap-2">
+              <button
+                onClick={onOpenLookup}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+              >
+                <Search className="w-3.5 h-3.5 text-teal-400" />
+                Track Appointment
+              </button>
+              <a
+                href="/admin"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+              >
+                <Lock className="w-3.5 h-3.5 text-teal-500" />
+                Doctor Portal
+              </a>
+            </div>
           </div>
 
           {/* Quick Links */}
@@ -36,7 +52,10 @@ export default function Footer() {
               <li><a href="#services" className="hover:text-teal-400 transition-colors">Treatments</a></li>
               <li><a href="#about" className="hover:text-teal-400 transition-colors">The Doctor</a></li>
               <li><a href="#branches" className="hover:text-teal-400 transition-colors">Branches</a></li>
+              <li><a href="#reviews" className="hover:text-teal-400 transition-colors">Patient Reviews</a></li>
               <li><a href="#book" className="hover:text-teal-400 transition-colors text-teal-400">Book Appointment</a></li>
+              <li><a href="/privacy.html" className="hover:text-teal-400 transition-colors">Privacy Notice</a></li>
+              <li><a href="/image-credits.html" className="hover:text-teal-400 transition-colors">Image Credits</a></li>
             </ul>
           </div>
 

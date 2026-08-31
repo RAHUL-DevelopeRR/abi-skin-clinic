@@ -1,4 +1,3 @@
-import React from 'react';
 
 export default function ClinicLogo({ className = "w-10 h-12" }) {
   return (

@@ -28,7 +28,7 @@ const IMAGES = [
     src: karurBranch2,
     category: 'karur',
     title: 'Karur Clinic Building Entrance',
-    description: 'Dr. G. Srinivasan\'s main clinic building in Madavilagam, Karur (Timing: 9:00 AM - 2:00 PM).'
+    description: 'Dr. G. Srinivasan\'s main clinic building in Madavilagam, Karur (morning timing: 9:00 AM - 1:00 PM).'
   },
   {
     src: karurBranch1,
@@ -68,7 +68,7 @@ const IMAGES = [
     src: treatmentImg,
     category: 'general',
     title: 'Advanced Aesthetic Laser Suite',
-    description: 'Fully equipped clinical room for FDA-approved laser treatments, PRP, and peel therapies.'
+    description: 'Clinical treatment room used for doctor-supervised dermatology, laser and IPL procedures.'
   },
   {
     src: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=800&q=80',
@@ -85,18 +85,19 @@ export default function Facilities() {
   const filteredImages = activeTab === 'all' 
     ? IMAGES 
     : IMAGES.filter(img => img.category === activeTab);
+  const imageCount = filteredImages.length;
 
   // Handle keyboard events for lightbox
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (lightboxIndex === null) return;
       if (e.key === 'Escape') setLightboxIndex(null);
-      if (e.key === 'ArrowRight') handleNext();
-      if (e.key === 'ArrowLeft') handlePrev();
+      if (e.key === 'ArrowRight') setLightboxIndex((current) => (current === null ? null : (current + 1) % imageCount));
+      if (e.key === 'ArrowLeft') setLightboxIndex((current) => (current === null ? null : (current - 1 + imageCount) % imageCount));
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [lightboxIndex, filteredImages]);
+  }, [lightboxIndex, imageCount]);
 
   const handleNext = () => {
     setLightboxIndex((prev) => (prev === null ? null : (prev + 1) % filteredImages.length));

@@ -1,218 +1,195 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import TiltedCard from './TiltedCard';
-import SpotlightCard from './SpotlightCard';
+import { AnimatePresence, motion } from 'framer-motion';
+import acneImage from '../assets/treatments/acne.jpg';
+import alopeciaImage from '../assets/treatments/alopecia.jpg';
+import cryotherapyImage from '../assets/treatments/cryotherapy.jpg';
+import laserImage from '../assets/treatments/laser-hair-removal.jpg';
+import nailFungusImage from '../assets/treatments/nail-fungus.jpg';
+import psoriasisImage from '../assets/treatments/psoriasis.jpg';
+import urticariaImage from '../assets/treatments/urticaria.jpg';
+import vitiligoImage from '../assets/treatments/vitiligo.jpg';
 
-const SERVICES_DATA = [
-  // Skin Services
+const SERVICES = [
   {
-    id: 'skin-1',
-    category: 'Skin',
-    title: 'Acne & Scar Revision',
-    description: 'Advanced clinical treatments for active acne, cystic breakouts, and deep acne scars. Utilizes localized peels and micro-needling.',
-    sessions: '3-6 Sessions',
-    image: 'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?auto=format&fit=crop&w=600&q=80',
-    highlights: ['Comedone extraction', 'Salicylic peels', 'Scar resurfacing']
+    id: 'unwanted-hair',
+    category: 'Laser & IPL',
+    title: 'Unwanted Hair Removal',
+    description: 'Doctor-supervised laser and IPL options selected for the treatment area and individual skin type.',
+    image: laserImage,
+    imageAlt: 'Clinician performing laser hair removal',
+    highlights: ['Unwanted hair removal', 'IPL laser', 'Skin glow treatments'],
   },
   {
-    id: 'skin-2',
-    category: 'Skin',
-    title: 'Eczema & Psoriasis Management',
-    description: 'Specialized treatment plans for chronic skin conditions, providing quick relief from itching, inflammation, and scaling.',
-    sessions: 'Ongoing support',
-    image: 'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?auto=format&fit=crop&w=600&q=80',
-    highlights: ['Steroid-free alternatives', 'Biologics consulting', 'Dietary trigger guidance']
+    id: 'pigmentation-laser',
+    category: 'Laser & IPL',
+    title: 'Pigmentation & Acne Scar Lasers',
+    description: 'A tailored treatment plan for pigmentation and acne scarring, with laser suitability assessed in consultation.',
+    image: acneImage,
+    imageAlt: 'Clinical illustration showing acne formation in the skin',
+    highlights: ['Acne pigmentation', 'Acne scars', 'Pigmentation lasers'],
   },
   {
-    id: 'skin-3',
-    category: 'Skin',
-    title: 'Wart, Mole & Tag Removal',
-    description: 'Quick, safe, and virtually painless radiofrequency cauterization or laser removal of warts, moles, skin tags, and DPNs.',
-    sessions: '1 Session (Instant)',
-    image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
-    highlights: ['Scarless healing', 'Local anesthesia', 'Same-day biopsy check']
+    id: 'facial-warts-tattoo',
+    category: 'Laser & IPL',
+    title: 'Facial Warts & Tattoo Removal',
+    description: 'Laser procedures for suitable facial warts and tattoos after diagnosis and treatment-area assessment.',
+    image: laserImage,
+    imageAlt: 'Clinician using a medical laser treatment device',
+    highlights: ['Facial wart laser', 'Laser tattoo removal', 'Doctor assessment first'],
   },
-  
-  // Hair Services
   {
-    id: 'hair-1',
+    id: 'cryotherapy',
+    category: 'Medical',
+    title: 'Liquid Nitrogen Cryotherapy',
+    description: 'Targeted freezing treatment for suitable skin lesions, including selected warts, following examination.',
+    image: cryotherapyImage,
+    imageAlt: 'Liquid nitrogen cryotherapy being applied to a wart',
+    highlights: ['Liquid nitrogen', 'Wart treatment', 'In-clinic procedure'],
+  },
+  {
+    id: 'acne',
+    category: 'Medical',
+    title: 'Acne, Pigmentation & Scars',
+    description: 'Medical care for active acne, post-acne pigmentation and acne scars based on severity and skin type.',
+    image: acneImage,
+    imageAlt: 'Clinical illustration showing acne formation in the skin',
+    highlights: ['Active acne', 'Acne pigmentation', 'Acne scar care'],
+  },
+  {
+    id: 'psoriasis-eczema',
+    category: 'Medical',
+    title: 'Psoriasis & Eczema',
+    description: 'Diagnosis, flare management and longer-term care plans for inflammatory skin conditions.',
+    image: psoriasisImage,
+    imageAlt: 'Clinical reference photograph of psoriasis',
+    highlights: ['Psoriasis', 'Eczema', 'Itch and flare management'],
+  },
+  {
+    id: 'vitiligo',
+    category: 'Medical',
+    title: 'Vitiligo Care',
+    description: 'Clinical evaluation and treatment planning for vitiligo, with progress reviewed over time.',
+    image: vitiligoImage,
+    imageAlt: 'Clinical reference photograph of vitiligo',
+    highlights: ['Vitiligo assessment', 'Treatment planning', 'Follow-up care'],
+  },
+  {
+    id: 'urticaria-lichen-planus',
+    category: 'Medical',
+    title: 'Urticaria & Lichen Planus',
+    description: 'Evaluation of recurrent hives, triggers and inflammatory rashes, including lichen planus.',
+    image: urticariaImage,
+    imageAlt: 'Clinical reference photograph of urticaria or hives',
+    highlights: ['Urticaria', 'Lichen planus', 'Trigger evaluation'],
+  },
+  {
+    id: 'fungal-nail',
+    category: 'Medical',
+    title: 'Fungal & Nail Diseases',
+    description: 'Diagnosis and treatment of fungal skin infections and nail disorders after clinical examination.',
+    image: nailFungusImage,
+    imageAlt: 'Clinical reference photograph of fungal nail disease',
+    highlights: ['Ringworm', 'Nail fungus', 'Nail diseases'],
+  },
+  {
+    id: 'hair-loss-alopecia',
     category: 'Hair',
-    title: 'PRP Hair Rejuvenation',
-    description: 'Platelet-Rich Plasma therapy using your own growth factors to stimulate dormant follicles, increase density, and stop hair thinning.',
-    sessions: '4-8 Sessions',
-    image: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=600&q=80',
-    highlights: ['High-density spin tubes', 'Minimal downtime', 'Natural follicular growth']
+    title: 'Hair Loss & Alopecia',
+    description: 'Doctor-led evaluation of hair loss and alopecia with treatment based on the identified cause.',
+    image: alopeciaImage,
+    imageAlt: 'Clinical reference photograph of alopecia areata',
+    highlights: ['Hair loss', 'Alopecia', 'Scalp evaluation'],
   },
-  {
-    id: 'hair-2',
-    category: 'Hair',
-    title: 'Alopecia & Thinning Treatment',
-    description: 'Comprehensive trichology analysis to combat alopecia areata and male/female pattern baldness with customized medical plans.',
-    sessions: '3-12 Months Plan',
-    image: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=600&q=80',
-    highlights: ['DHT blocker therapy', 'Laser comb stimulation', 'Nutritional guidance']
-  },
-  {
-    id: 'hair-3',
-    category: 'Hair',
-    title: 'Anti-Dandruff & Scalp Detox',
-    description: 'Medical scalp peeling and anti-fungal treatments to eliminate stubborn dandruff, seborrheic dermatitis, and scalp itching.',
-    sessions: '2-4 Sessions',
-    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80',
-    highlights: ['Scalp scaling', 'Laser blue light therapy', 'PH balancing rinse']
-  },
-
-  // Aesthetic Services
-  {
-    id: 'aesthetic-1',
-    category: 'Aesthetic',
-    title: 'Hydrafacial & Skin Polishing',
-    description: 'Multi-step skin resurfacing that cleanses, exfoliates, and extracts impurities while infusing vital antioxidants and hydration.',
-    sessions: 'Monthly maintenance',
-    image: 'https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?auto=format&fit=crop&w=600&q=80',
-    highlights: ['Vortex suction cleaning', 'Hyaluronic acid infusion', 'Instant red-carpet glow']
-  },
-  {
-    id: 'aesthetic-2',
-    category: 'Aesthetic',
-    title: 'Laser Hair Reduction',
-    description: 'US-FDA approved diode laser technology for safe, permanent reduction of unwanted hair on face, underarms, or full body.',
-    sessions: '6-8 Sessions',
-    image: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=600&q=80',
-    highlights: ['Cooling tip technology', 'Pain-free sessions', 'Safe for all Indian skin types']
-  },
-  {
-    id: 'aesthetic-3',
-    category: 'Aesthetic',
-    title: 'Carbon Laser Peel & Toning',
-    description: 'Also known as the "Hollywood Peel." Lasing action targets carbon particles to tighten pores, reduce pigmentation, and brighten tone.',
-    sessions: '3-5 Sessions',
-    image: 'https://images.unsplash.com/photo-1552693673-1bf958298935?auto=format&fit=crop&w=600&q=80',
-    highlights: ['Deep pore tightening', 'Oil control', 'Immediate brightening']
-  }
 ];
 
-export default function Services() {
-  const [activeTab, setActiveTab] = useState('Skin');
-  const categories = ['Skin', 'Hair', 'Aesthetic', 'All'];
+const CATEGORIES = ['All', 'Laser & IPL', 'Medical', 'Hair'];
 
-  const filteredServices = activeTab === 'All' 
-    ? SERVICES_DATA 
-    : SERVICES_DATA.filter(s => s.category === activeTab);
+export default function Services() {
+  const [activeCategory, setActiveCategory] = useState('All');
+  const visibleServices = activeCategory === 'All'
+    ? SERVICES
+    : SERVICES.filter((service) => service.category === activeCategory);
 
   return (
-    <section id="services" className="py-24 px-6 bg-slate-50 dark:bg-slate-900/40 relative">
-      <div className="max-w-7xl mx-auto">
-        
-        {/* Header */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 text-xs font-bold uppercase tracking-widest mb-3">
-            Top Skin & Hair Care Clinic in Karur & Velayuthampalayam
-          </div>
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white mb-4">
-            Dermatology & Cosmetology Treatments
+    <section id="services" className="relative bg-slate-50 px-6 py-24 dark:bg-slate-900/40">
+      <div className="mx-auto max-w-7xl">
+        <div className="mx-auto mb-12 max-w-3xl text-center">
+          <span className="mb-4 inline-flex rounded-full bg-teal-500/10 px-4 py-2 text-xs font-extrabold uppercase tracking-widest text-teal-700 dark:text-teal-300">
+            Doctor-led dermatology, laser & IPL care
+          </span>
+          <h2 className="mb-5 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-5xl dark:text-white">
+            Treatments available at ABI Clinic
           </h2>
-          <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto font-medium">
-            We combine medical-grade clinical science with premium aesthetic technologies to deliver visible, long-term results for your skin and hair.
+          <p className="font-medium leading-relaxed text-slate-600 dark:text-slate-300">
+            Every procedure starts with a clinical assessment. The doctor will confirm the diagnosis, treatment suitability and expected course before proceeding.
           </p>
         </div>
 
-        {/* Categories Tab bar */}
-        <div className="flex justify-center gap-2 mb-12 flex-wrap">
-          {categories.map((cat) => (
+        <div className="mb-12 flex flex-wrap justify-center gap-2" aria-label="Filter treatments">
+          {CATEGORIES.map((category) => (
             <button
-              key={cat}
-              onClick={() => setActiveTab(cat)}
-              className={`relative px-6 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer ${
-                activeTab === cat
-                  ? 'bg-teal-600 text-white shadow-md shadow-teal-600/10'
-                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-355 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/50 dark:border-slate-850'
+              key={category}
+              type="button"
+              onClick={() => setActiveCategory(category)}
+              aria-pressed={activeCategory === category}
+              className={`rounded-full border px-5 py-2.5 text-sm font-bold transition-colors ${
+                activeCategory === category
+                  ? 'border-teal-600 bg-teal-600 text-white'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
               }`}
             >
-              {cat === 'All' ? 'All Treatments' : `${cat} Care`}
+              {category === 'All' ? 'All Treatments' : category}
             </button>
           ))}
         </div>
 
-        {/* Services Grid */}
-        <motion.div 
-          layout
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-        >
+        <motion.div layout className="grid grid-cols-1 gap-7 md:grid-cols-2 lg:grid-cols-3">
           <AnimatePresence mode="popLayout">
-            {filteredServices.map((service, index) => {
-              return (
-                <motion.div
-                  key={service.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.4, delay: index * 0.05 }}
-                  className="h-full"
-                >
-                  <TiltedCard tiltMaxAngleX={8} tiltMaxAngleY={8} className="h-full">
-                    <SpotlightCard className="h-full rounded-3xl bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-850/80 shadow-sm hover:shadow-md transition-shadow p-8 flex flex-col justify-between">
-                      <div>
-                        {/* Header Info */}
-                        <div className="flex justify-between items-center mb-6">
-                          {/* Elegant typographic number replaces generic Lucide icons */}
-                          <span className="text-3xl font-extrabold text-teal-200 dark:text-teal-900/65 font-serif italic tracking-tighter select-none">
-                            0{index + 1}
-                          </span>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200/20">
-                            {service.sessions}
-                          </span>
-                        </div>
+            {visibleServices.map((service) => (
+              <motion.article
+                key={service.id}
+                layout
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 12 }}
+                transition={{ duration: 0.25 }}
+                className="group overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm transition-shadow hover:shadow-xl hover:shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950"
+              >
+                <div className="relative h-52 overflow-hidden bg-slate-100 dark:bg-slate-900">
+                  <img
+                    src={service.image}
+                    alt={service.imageAlt}
+                    loading="lazy"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 to-transparent px-5 pb-4 pt-10">
+                    <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest text-white backdrop-blur-sm">
+                      {service.category}
+                    </span>
+                  </div>
+                </div>
 
-                        {/* Service Image Banner */}
-                        <div className="w-full h-44 rounded-2xl overflow-hidden mb-6 bg-slate-100 dark:bg-slate-900 border border-slate-200/20 dark:border-slate-800/20 relative shadow-sm">
-                          <img 
-                            src={service.image} 
-                            alt={service.title} 
-                            className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500" 
-                            loading="lazy"
-                          />
-                        </div>
-
-                        {/* Title */}
-                        <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mb-3">
-                          {service.title}
-                        </h3>
-
-                        {/* Description */}
-                        <p className="text-sm text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-6">
-                          {service.description}
-                        </p>
-                      </div>
-
-                      {/* Highlights */}
-                      <div className="border-t border-slate-100 dark:border-slate-900 pt-5">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">Key Inclusions:</span>
-                        <ul className="space-y-2">
-                          {service.highlights.map((h, i) => (
-                            <li key={i} className="flex items-center gap-2 text-xs font-semibold text-slate-650 dark:text-slate-350">
-                              <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-                              <span>{h}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </SpotlightCard>
-                  </TiltedCard>
-                </motion.div>
-              );
-            })}
+                <div className="p-7">
+                  <h3 className="mb-3 text-xl font-extrabold text-slate-950 dark:text-white">{service.title}</h3>
+                  <p className="mb-5 text-sm font-medium leading-relaxed text-slate-600 dark:text-slate-400">{service.description}</p>
+                  <ul className="space-y-2 border-t border-slate-100 pt-5 dark:border-slate-800">
+                    {service.highlights.map((highlight) => (
+                      <li key={highlight} className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-teal-500" aria-hidden="true" />
+                        {highlight}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </motion.article>
+            ))}
           </AnimatePresence>
         </motion.div>
 
-        {/* Bottom Notice */}
-        <div className="text-center mt-16 p-6 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200/40 dark:border-slate-800/40 max-w-2xl mx-auto">
-          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 leading-relaxed">
-            *All therapies are customized by Dr. Srinivasan G. following a deep clinical analysis of your skin type, medical history, and specific diagnostic goals.
-          </span>
+        <div className="mx-auto mt-12 max-w-3xl rounded-2xl border border-teal-200/70 bg-teal-50 px-6 py-5 text-center text-sm font-semibold leading-relaxed text-teal-950 dark:border-teal-900 dark:bg-teal-950/40 dark:text-teal-100">
+          Clinical images are educational references, not before-and-after results. Treatment availability and suitability are confirmed by Dr. G. Srinivasan during consultation.{' '}
+          <a href="/image-credits.html" className="underline decoration-teal-400 underline-offset-4 hover:text-teal-700 dark:hover:text-teal-300">Image credits</a>
         </div>
-
       </div>
     </section>
   );
