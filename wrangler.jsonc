@@ -8,14 +8,8 @@
     {
       "binding": "DB",
       "database_name": "abi-skin-clinic-db",
+      "database_id": "a352f4a8-7d49-49ec-be00-d1c4b82a185f",
       "migrations_dir": "migrations"
     }
-  ],
-  "observability": {
-    "enabled": true,
-    "logs": {
-      "enabled": true,
-      "head_sampling_rate": 1
-    }
-  }
+  ]
 }
