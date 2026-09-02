@@ -37,6 +37,12 @@ jobs:
           java-version: 21
           cache: gradle
       - uses: android-actions/setup-android@v3
+      - name: Restore Firebase configuration
+        env:
+          FIREBASE_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          test -n "$FIREBASE_BASE64"
+          printf '%s' "$FIREBASE_BASE64" | base64 --decode > android/app/google-services.json
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: npx cap sync android
@@ -67,8 +73,8 @@ jobs:
           FIREBASE_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           test -n "$KEYSTORE_BASE64" && test -n "$FIREBASE_BASE64"
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
-          echo "$FIREBASE_BASE64" | base64 --decode > android/app/google-services.json
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+          printf '%s' "$FIREBASE_BASE64" | base64 --decode > android/app/google-services.json
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: npx cap sync android

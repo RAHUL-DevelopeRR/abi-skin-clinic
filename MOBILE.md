@@ -35,7 +35,8 @@ GitHub Actions also builds and retains this APK after Android-related pushes.
 3. Create a Firebase service account with permission to send Cloud Messaging.
 4. Upload the complete service-account JSON as the Cloudflare Pages secret
    `FIREBASE_SERVICE_ACCOUNT_JSON`.
-5. Apply D1 migration `0003_doctor_devices.sql` and redeploy the Pages app.
+5. Set the Cloudflare Pages secret `MOBILE_PUSH_ENABLED` to `true`.
+6. Apply D1 migration `0003_doctor_devices.sql` and redeploy the Pages app.
 
 Without the Firebase secret, appointment creation remains functional and push
 delivery is safely skipped.
