@@ -173,10 +173,13 @@ export default function AdminDashboard() {
     }).then((stop) => { stopMonitoring = stop; }).catch(() => {});
     if (isNativeApp) {
       enableAppointmentNotifications().catch(() => {});
-      registerPushNotifications(
-        (token) => api('/api/admin/device-tokens', { method: 'POST', body: JSON.stringify({ token, platform: 'android' }) }),
-        () => load({ silent: true }),
-      ).then((stop) => { stopPushNotifications = stop; }).catch(() => {});
+      api('/api/admin/mobile-config').then((config) => {
+        if (!config.pushNotifications) return undefined;
+        return registerPushNotifications(
+          (token) => api('/api/admin/device-tokens', { method: 'POST', body: JSON.stringify({ token, platform: 'android' }) }),
+          () => load({ silent: true }),
+        );
+      }).then((stop) => { if (stop) stopPushNotifications = stop; }).catch(() => {});
     }
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible' && navigator.onLine) load({ silent: true });

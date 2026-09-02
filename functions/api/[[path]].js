@@ -621,6 +621,12 @@ async function routeAdmin(context, path) {
     `).bind(token, platform).run();
     return json({ registered: true });
   }
+  if (path === 'admin/mobile-config' && method === 'GET') {
+    return json({
+      pushNotifications: context.env.MOBILE_PUSH_ENABLED === 'true'
+        && Boolean(context.env.FIREBASE_SERVICE_ACCOUNT_JSON),
+    });
+  }
   if (path === 'admin/dashboard' && method === 'GET') return json(await dashboard(DB));
   if (path === 'admin/appointments' && method === 'GET') return json({ appointments: await listAppointments(DB, context.request) });
   if (path === 'admin/appointments/export' && method === 'GET') return exportAppointments(DB, context.request);
