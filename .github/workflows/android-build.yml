@@ -1,0 +1,85 @@
+name: Android Doctor App
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "android/**"
+      - "src/**"
+      - "functions/**"
+      - "capacitor.config.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/android-build.yml"
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Build the signed Play Store bundle
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npx cap sync android
+      - run: chmod +x android/gradlew && android/gradlew -p android assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: abi-doctor-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Restore private release files
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          FIREBASE_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64" && test -n "$FIREBASE_BASE64"
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+          echo "$FIREBASE_BASE64" | base64 --decode > android/app/google-services.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npx cap sync android
+      - name: Build signed Play Store bundle
+        env:
+          ANDROID_KEYSTORE_PATH: release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: chmod +x android/gradlew && android/gradlew -p android bundleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: abi-doctor-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab

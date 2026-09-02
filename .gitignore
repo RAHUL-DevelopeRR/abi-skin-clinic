@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .wrangler
+android/.gradle-user/
 .dev.vars
 .dev.vars.*
 !.dev.vars.example

@@ -1,0 +1,19 @@
+{
+  "appId": "in.abiskinandhaircare.doctor",
+  "appName": "ABI Doctor",
+  "webDir": "dist",
+  "server": {
+    "url": "https://abiskinandhaircare.in/admin",
+    "cleartext": false,
+    "allowNavigation": ["abiskinandhaircare.in"]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#020617"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "iconColor": "#0d9488"
+    }
+  }
+}

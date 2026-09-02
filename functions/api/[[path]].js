@@ -2,6 +2,7 @@ import { ApiError, errorResponse, json, methodNotAllowed, readJson, requireSameO
 import { clearSessionCookie, createSession, destroySession, requireAdmin, verifySecret } from '../_lib/auth.js';
 import { enforceRateLimit, isUniqueConstraintError, writeAudit } from '../_lib/database.js';
 import { getAvailability, getZonedNow, timeToMinutes } from '../_lib/schedule.js';
+import { sendNewAppointmentNotification } from '../_lib/push.js';
 import {
   date as validateDate,
   id as validateId,
@@ -110,6 +111,9 @@ async function createAppointment(context) {
     appointmentDate,
     timeSlot,
   }));
+  const notificationTask = sendNewAppointmentNotification(context.env)
+    .catch((error) => console.error('Appointment push notification failed.', error.message));
+  if (typeof context.waitUntil === 'function') context.waitUntil(notificationTask);
   return json({
     appointment: {
       id: appointmentId,
@@ -605,6 +609,17 @@ async function routeAdmin(context, path) {
     if (method !== 'POST') return methodNotAllowed(['POST']);
     await destroySession(DB, context.request);
     return json({ authenticated: false }, 200, { 'Set-Cookie': clearSessionCookie(context.request) });
+  }
+  if (path === 'admin/device-tokens') {
+    if (method !== 'POST') return methodNotAllowed(['POST']);
+    const body = await readJson(context.request);
+    const token = text(body.token, 'Device token', { min: 20, max: 4096 });
+    const platform = oneOf(body.platform, ['android', 'ios'], 'Platform');
+    await DB.prepare(`
+      INSERT INTO doctor_devices (token, platform) VALUES (?, ?)
+      ON CONFLICT(token) DO UPDATE SET platform = excluded.platform, updated_at = CURRENT_TIMESTAMP
+    `).bind(token, platform).run();
+    return json({ registered: true });
   }
   if (path === 'admin/dashboard' && method === 'GET') return json(await dashboard(DB));
   if (path === 'admin/appointments' && method === 'GET') return json({ appointments: await listAppointments(DB, context.request) });

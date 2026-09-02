@@ -40,6 +40,63 @@
   --color-slate-950: #080f24; /* Black-Blue background */
 }
 
+@media (max-width: 767px) {
+  main table,
+  main table tbody,
+  main table tr,
+  main table td {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+
+  main table thead {
+    display: none;
+  }
+
+  main table tbody {
+    padding: 0.75rem;
+  }
+
+  main table tr {
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    border: 1px solid rgb(226 232 240);
+    border-radius: 1rem;
+  }
+
+  main table td {
+    display: grid;
+    grid-template-columns: 7rem minmax(0, 1fr);
+    gap: 0.75rem;
+    border-top: 1px solid rgb(226 232 240);
+    padding: 0.8rem;
+  }
+
+  main table td:first-child {
+    border-top: 0;
+  }
+
+  main table td::before {
+    color: rgb(100 116 139);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  main table td:nth-child(1)::before { content: 'Patient'; }
+  main table td:nth-child(2)::before { content: 'Appointment'; }
+  main table td:nth-child(3)::before { content: 'Treatment'; }
+  main table td:nth-child(4)::before { content: 'Status'; }
+  main table td:nth-child(5)::before { content: 'Contact'; }
+
+  .dark main table tr,
+  .dark main table td {
+    border-color: rgb(30 41 59);
+  }
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--color-slate-50);

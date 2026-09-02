@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2, ClipboardList, Clock3, Copy, LayoutDashboard,
-  LoaderCircle, LogOut, MessageSquareQuote, Palmtree, RefreshCw, Save, ShieldCheck, Trash2, XCircle,
+  ExternalLink, LoaderCircle, LogOut, MapPinned, MessageSquareQuote, Navigation,
+  Palmtree, RefreshCw, Save, ShieldCheck, Trash2, Wifi, WifiOff, XCircle,
 } from 'lucide-react';
 import { api, formatTime, getLocalDateString } from '../lib/api';
+import {
+  enableAppointmentNotifications, isNativeApp, monitorNativeApp,
+  notifyNewAppointments, openExternal, registerPushNotifications,
+} from '../lib/native';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const STATUSES = ['requested', 'confirmed', 'completed', 'cancelled', 'no_show'];
@@ -13,6 +18,7 @@ const TABS = [
   ['schedule', 'Working days', Clock3],
   ['leaves', 'Leave days', Palmtree],
   ['reviews', 'Reviews', MessageSquareQuote],
+  ['clinics', 'Clinics', MapPinned],
 ];
 
 function Loading() {
@@ -100,6 +106,20 @@ function Leaves({ leaves, branches, onCreate, onDelete }) {
   return <div className="space-y-6"><form onSubmit={(event) => { event.preventDefault(); onCreate(form); }} className="grid md:grid-cols-4 gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"><input required type="date" min={getLocalDateString()} value={form.date} onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-3" /><select value={form.branchId} onChange={(event) => setForm((current) => ({ ...current, branchId: event.target.value }))} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-3"><option value="">All branches</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select><input required minLength="2" maxLength="200" value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-3" /><button className="rounded-xl bg-teal-600 text-white font-bold">Add leave day</button></form>{leaves.length ? <div className="space-y-3">{leaves.map((leave) => <div key={leave.id} className="flex justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4"><div><strong>{leave.leave_date}</strong><p className="text-xs text-slate-500">{leave.branch_name || 'All branches'} · {leave.reason}</p></div><button onClick={() => onDelete(leave.id)} className="text-red-500"><Trash2 className="w-5 h-5" /></button></div>)}</div> : <Empty>No leave days configured.</Empty>}</div>;
 }
 
+function Clinics({ branches }) {
+  return <div className="grid gap-4 lg:grid-cols-2">{branches.map((branch) => {
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${branch.name}, ${branch.address}`)}`;
+    return <article key={branch.id} className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-start gap-3"><MapPinned className="mt-1 h-6 w-6 shrink-0 text-teal-600" /><div><h2 className="font-extrabold">{branch.name}</h2><p className="mt-1 text-sm leading-6 text-slate-500">{branch.address}</p></div></div>
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <button type="button" onClick={() => openExternal(mapsUrl)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-3 text-sm font-bold text-white"><Navigation className="h-4 w-4" />Navigate</button>
+        <a href={`tel:${branch.phone}`} className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold dark:border-slate-700">Call clinic</a>
+      </div>
+      <button type="button" onClick={() => openExternal(mapsUrl)} className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-teal-600">Open Google Maps and reviews <ExternalLink className="h-4 w-4" /></button>
+    </article>;
+  })}</div>;
+}
+
 function ReviewsAdmin({ reviews, onModerate, onDelete }) {
   return reviews.length ? <div className="grid lg:grid-cols-2 gap-4">{reviews.map((review) => <article key={review.id} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"><div className="flex justify-between gap-3"><div><strong>{review.patient_name}</strong><p className="text-xs text-slate-500">{review.reference} · {review.rating}/5</p></div><span className={`h-fit px-2 py-1 rounded-full text-[10px] font-bold uppercase ${statusClass(review.status)}`}>{review.status}</span></div><p className="my-4 text-sm text-slate-600 dark:text-slate-300">“{review.comment}”</p><div className="flex gap-2"><button onClick={() => onModerate(review.id, 'approved')} className="inline-flex items-center gap-1 rounded-lg bg-green-100 text-green-700 px-3 py-2 text-xs font-bold"><CheckCircle2 className="w-4 h-4" />Approve</button><button onClick={() => onModerate(review.id, 'rejected')} className="inline-flex items-center gap-1 rounded-lg bg-red-100 text-red-700 px-3 py-2 text-xs font-bold"><XCircle className="w-4 h-4" />Reject</button><button onClick={() => onDelete(review.id)} className="ml-auto text-red-500"><Trash2 className="w-4 h-4" /></button></div></article>)}</div> : <Empty>No submitted reviews.</Empty>;
 }
@@ -111,16 +131,28 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [connected, setConnected] = useState(navigator.onLine);
+  const [lastSynced, setLastSynced] = useState(null);
+  const knownAppointmentIds = useRef(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError('');
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    setError('');
     try {
       const [dashboard, appointments, schedule, leaves, reviews] = await Promise.all([api('/api/admin/dashboard'), api('/api/admin/appointments'), api('/api/admin/schedule'), api('/api/admin/leaves'), api('/api/admin/reviews')]);
-      setData({ dashboard, appointments: appointments.appointments, schedule, leaves: leaves.leaves, reviews: reviews.reviews });
+      const nextAppointments = appointments.appointments;
+      if (knownAppointmentIds.current) {
+        const newRequests = nextAppointments.filter((item) => item.status === 'requested' && !knownAppointmentIds.current.has(item.id));
+        if (newRequests.length) notifyNewAppointments(newRequests.length).catch(() => {});
+      }
+      knownAppointmentIds.current = new Set(nextAppointments.map((item) => item.id));
+      setData({ dashboard, appointments: nextAppointments, schedule, leaves: leaves.leaves, reviews: reviews.reviews });
       setAuthenticated(true);
+      setConnected(true);
+      setLastSynced(new Date());
     } catch (requestError) {
       if (requestError.status === 401) setAuthenticated(false); else setError(requestError.message);
-    } finally { setLoading(false); }
+    } finally { if (!silent) setLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -131,11 +163,31 @@ export default function AdminDashboard() {
       })
       .catch(() => setAuthenticated(false));
   }, [load]);
+  useEffect(() => {
+    if (!authenticated) return undefined;
+    let stopMonitoring = () => {};
+    let stopPushNotifications = () => {};
+    monitorNativeApp({
+      onResume: () => load({ silent: true }),
+      onNetworkChange: setConnected,
+    }).then((stop) => { stopMonitoring = stop; }).catch(() => {});
+    if (isNativeApp) {
+      enableAppointmentNotifications().catch(() => {});
+      registerPushNotifications(
+        (token) => api('/api/admin/device-tokens', { method: 'POST', body: JSON.stringify({ token, platform: 'android' }) }),
+        () => load({ silent: true }),
+      ).then((stop) => { stopPushNotifications = stop; }).catch(() => {});
+    }
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine) load({ silent: true });
+    }, 30_000);
+    return () => { window.clearInterval(timer); stopMonitoring(); stopPushNotifications(); };
+  }, [authenticated, load]);
   async function act(operation, success) { setError(''); setMessage(''); try { await operation(); setMessage(success); await load(); } catch (requestError) { setError(requestError.message); } }
   async function logout() { await api('/api/admin/logout', { method: 'POST', body: '{}' }); setAuthenticated(false); }
 
   if (authenticated === null) return <main className="min-h-screen bg-slate-950 text-white"><Loading /></main>;
   if (!authenticated) return <Login onLogin={() => { setAuthenticated(true); load(); }} />;
 
-  return <main className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100"><header className="sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 backdrop-blur"><div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4"><div><h1 className="text-xl font-extrabold">ABI Doctor Dashboard</h1><p className="text-xs text-slate-500">Live clinic operations</p></div><div className="flex gap-2"><button onClick={load} className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900" aria-label="Refresh"><RefreshCw className="w-4 h-4" /></button><button onClick={logout} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 px-4 py-2 text-sm font-bold"><LogOut className="w-4 h-4" />Logout</button></div></div></header><div className="max-w-7xl mx-auto p-4 sm:p-6"><nav className="flex gap-2 overflow-x-auto pb-3 mb-6">{TABS.map(([id, label, Icon]) => <button key={id} onClick={() => setTab(id)} className={`shrink-0 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-teal-600 text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800'}`}><Icon className="w-4 h-4" />{label}</button>)}</nav>{message && <p className="mb-5 rounded-xl bg-green-100 text-green-700 p-3 text-sm">{message}</p>}{error && <p className="mb-5 rounded-xl bg-red-100 text-red-700 p-3 text-sm" role="alert">{error}</p>}{loading && !data.dashboard ? <Loading /> : <>{tab === 'overview' && <Overview data={data.dashboard} />}{tab === 'appointments' && <Appointments appointments={data.appointments} onUpdate={(item, status) => act(() => api(`/api/admin/appointments/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status, adminNotes: item.admin_notes || '' }) }), 'Appointment updated.')} />}{tab === 'schedule' && <Schedule data={data.schedule} onSave={(branchId, periods) => act(() => api(`/api/admin/schedule/${branchId}`, { method: 'PUT', body: JSON.stringify({ periods }) }), 'Working schedule saved.')} onToggleService={(id, active) => act(() => api(`/api/admin/services/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) }), 'Service availability updated.')} />}{tab === 'leaves' && <Leaves leaves={data.leaves} branches={data.schedule.branches} onCreate={(form) => act(() => api('/api/admin/leaves', { method: 'POST', body: JSON.stringify(form) }), 'Leave day added; public slots are updated.')} onDelete={(id) => act(() => api(`/api/admin/leaves/${id}`, { method: 'DELETE' }), 'Leave day removed.')} />}{tab === 'reviews' && <ReviewsAdmin reviews={data.reviews} onModerate={(id, status) => act(() => api(`/api/admin/reviews/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }), 'Review moderated.')} onDelete={(id) => act(() => api(`/api/admin/reviews/${id}`, { method: 'DELETE' }), 'Review deleted.')} />}</>}</div></main>;
+  return <main className="min-h-screen bg-slate-50 pb-[env(safe-area-inset-bottom)] text-slate-900 dark:bg-slate-950 dark:text-slate-100"><header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3"><div><h1 className="text-lg font-extrabold sm:text-xl">ABI Doctor Dashboard</h1><p className={`flex items-center gap-1 text-xs ${connected ? 'text-teal-600' : 'text-red-500'}`}>{connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}{connected ? `Live${lastSynced ? ` · synced ${lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}` : 'Offline'}</p></div><div className="flex gap-2"><button onClick={() => load()} className="rounded-xl bg-slate-100 p-2.5 dark:bg-slate-900" aria-label="Refresh"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button><button onClick={logout} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-950"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Logout</span></button></div></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6"><nav className="mb-6 flex gap-2 overflow-x-auto pb-3">{TABS.map(([id, label, Icon]) => <button key={id} onClick={() => setTab(id)} className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'}`}><Icon className="h-4 w-4" />{label}</button>)}</nav>{message && <p className="mb-5 rounded-xl bg-green-100 p-3 text-sm text-green-700">{message}</p>}{error && <p className="mb-5 rounded-xl bg-red-100 p-3 text-sm text-red-700" role="alert">{error}</p>}{loading && !data.dashboard ? <Loading /> : <>{tab === 'overview' && <Overview data={data.dashboard} />}{tab === 'appointments' && <Appointments appointments={data.appointments} onUpdate={(item, status) => act(() => api(`/api/admin/appointments/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status, adminNotes: item.admin_notes || '' }) }), 'Appointment updated.')} />}{tab === 'schedule' && <Schedule data={data.schedule} onSave={(branchId, periods) => act(() => api(`/api/admin/schedule/${branchId}`, { method: 'PUT', body: JSON.stringify({ periods }) }), 'Working schedule saved.')} onToggleService={(id, active) => act(() => api(`/api/admin/services/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) }), 'Service availability updated.')} />}{tab === 'leaves' && <Leaves leaves={data.leaves} branches={data.schedule.branches} onCreate={(form) => act(() => api('/api/admin/leaves', { method: 'POST', body: JSON.stringify(form) }), 'Leave day added; public slots are updated.')} onDelete={(id) => act(() => api(`/api/admin/leaves/${id}`, { method: 'DELETE' }), 'Leave day removed.')} />}{tab === 'reviews' && <ReviewsAdmin reviews={data.reviews} onModerate={(id, status) => act(() => api(`/api/admin/reviews/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }), 'Review moderated.')} onDelete={(id) => act(() => api(`/api/admin/reviews/${id}`, { method: 'DELETE' }), 'Review deleted.')} />}{tab === 'clinics' && <Clinics branches={data.schedule.branches} />}</>}</div></main>;
 }
