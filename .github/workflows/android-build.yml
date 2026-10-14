@@ -37,6 +37,8 @@ jobs:
           java-version: 21
           cache: gradle
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Restore Firebase configuration
         env:
           FIREBASE_BASE64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
@@ -67,6 +69,8 @@ jobs:
           java-version: 21
           cache: gradle
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Restore private release files
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
