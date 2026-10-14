@@ -77,6 +77,11 @@ export async function sendNewAppointmentNotification(env) {
         },
       }),
     });
-    if (!response.ok) console.error('Firebase notification delivery failed.', response.status);
+    if (response.status === 404) {
+      // The app was uninstalled or the token rotated; stop sending to it.
+      await env.DB.prepare('DELETE FROM doctor_devices WHERE token = ?').bind(token).run();
+    } else if (!response.ok) {
+      console.error('Firebase notification delivery failed.', response.status);
+    }
   }));
 }

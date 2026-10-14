@@ -12,6 +12,32 @@ export async function openExternal(url) {
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
+/** Copies text, falling back to execCommand where the Clipboard API is blocked (Android WebView). */
+export async function copyText(value) {
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    const field = document.createElement('textarea');
+    field.value = value;
+    field.setAttribute('readonly', '');
+    field.style.position = 'fixed';
+    field.style.opacity = '0';
+    document.body.appendChild(field);
+    field.select();
+    const copied = document.execCommand('copy');
+    field.remove();
+    return copied;
+  }
+}
+
+/** Link props for wa.me / sms: / tel: — the native app hands these to Android as intents. */
+export function externalLinkProps(href) {
+  return isNativeApp || !href.startsWith('http')
+    ? { href }
+    : { href, target: '_blank', rel: 'noopener noreferrer' };
+}
+
 export async function enableAppointmentNotifications() {
   if (!isNativeApp) return false;
   const current = await LocalNotifications.checkPermissions();

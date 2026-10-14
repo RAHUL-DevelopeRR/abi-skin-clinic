@@ -5,6 +5,7 @@
   "server": {
     "url": "https://abiskinandhaircare.in/admin",
     "cleartext": false,
+    "errorPath": "app-offline.html",
     "allowNavigation": ["abiskinandhaircare.in"]
   },
   "android": {

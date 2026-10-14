@@ -11,7 +11,7 @@
     "check": "npm run lint && npm test && npm run build",
     "preview": "vite preview",
     "pages:dev": "wrangler pages dev dist",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name=abi-skin-clinic",
+    "deploy": "npm run build && wrangler d1 migrations apply DB --remote && wrangler pages deploy dist --project-name=abi-skin-clinic --branch=main",
     "android:add": "npm run build && cap add android",
     "android:sync": "npm run build && cap sync android",
     "android:open": "cap open android",

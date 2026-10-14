@@ -4,7 +4,12 @@ import { enforceRateLimit, isUniqueConstraintError, writeAudit } from '../_lib/d
 import { getAvailability, getZonedNow, timeToMinutes } from '../_lib/schedule.js';
 import { sendNewAppointmentNotification } from '../_lib/push.js';
 import {
+  branchReviewLink, buildPatientMessage, eventForStatus, googleReviewLink, isWhatsAppConfigured,
+  loadAppointmentForMessage, reviewUrl, sendPatientWhatsApp,
+} from '../_lib/patient-messages.js';
+import {
   date as validateDate,
+  googleReviewUrl as validateGoogleReviewUrl,
   id as validateId,
   integer,
   oneOf,
@@ -27,7 +32,7 @@ function isMutation(method) {
 async function publicBootstrap(db) {
   const [branchResult, serviceResult, reviewResult, ratingResult] = await db.batch([
     db.prepare(`
-      SELECT id, name, address, phone, timezone
+      SELECT id, name, address, phone, timezone, google_review_url
       FROM branches WHERE active = 1 ORDER BY name
     `),
     db.prepare(`
@@ -111,8 +116,14 @@ async function createAppointment(context) {
     appointmentDate,
     timeSlot,
   }));
-  const notificationTask = sendNewAppointmentNotification(context.env)
-    .catch((error) => console.error('Appointment push notification failed.', error.message));
+  const origin = new URL(context.request.url).origin;
+  const notificationTask = Promise.all([
+    sendNewAppointmentNotification(context.env)
+      .catch((error) => console.error('Appointment push notification failed.', error.message)),
+    loadAppointmentForMessage(DB, appointmentId)
+      .then((appointment) => sendPatientWhatsApp(context.env, appointment, 'booked', origin))
+      .catch((error) => console.error('Patient WhatsApp acknowledgement failed.', error.message)),
+  ]);
   if (typeof context.waitUntil === 'function') context.waitUntil(notificationTask);
   return json({
     appointment: {
@@ -124,6 +135,7 @@ async function createAppointment(context) {
       timeSlot,
       status: 'requested',
     },
+    whatsappAcknowledgement: isWhatsAppConfigured(context.env),
     message: 'Your appointment request is stored and awaiting clinic confirmation.',
   }, 201);
 }
@@ -141,8 +153,9 @@ async function submitReview(context) {
   }
 
   const appointment = await DB.prepare(`
-    SELECT id FROM appointments
-    WHERE review_token = ? AND status = 'completed'
+    SELECT a.id, b.name, b.address, b.google_review_url
+    FROM appointments a JOIN branches b ON b.id = a.branch_id
+    WHERE a.review_token = ? AND a.status = 'completed'
   `).bind(token).first();
   if (!appointment) {
     throw new ApiError(404, 'INVALID_REVIEW_INVITE', 'This review invitation is invalid or not ready yet.');
@@ -161,7 +174,11 @@ async function submitReview(context) {
     throw error;
   }
 
-  return json({ message: 'Thank you. Your review was submitted for moderation.' }, 201);
+  return json({
+    message: 'Thank you. Your review was submitted for moderation.',
+    branchName: appointment.name,
+    googleReviewUrl: googleReviewLink(appointment),
+  }, 201);
 }
 
 async function login(context) {
@@ -220,6 +237,26 @@ async function dashboard(db) {
   };
 }
 
+const APPOINTMENT_COLUMNS = `
+  a.*, b.name AS branch_name, b.address AS branch_address, b.phone AS branch_phone, b.google_review_url,
+  s.name AS service_name,
+  (
+    SELECT json_object('event', n.event, 'status', n.status, 'error', n.error, 'created_at', n.created_at)
+    FROM patient_notifications n WHERE n.appointment_id = a.id
+    ORDER BY n.created_at DESC LIMIT 1
+  ) AS last_notification
+`;
+
+function withPatientMessage(appointment, origin) {
+  return {
+    ...appointment,
+    last_notification: appointment.last_notification ? JSON.parse(appointment.last_notification) : null,
+    review_url: reviewUrl(origin, appointment.review_token),
+    google_review_link: branchReviewLink(appointment),
+    patient_message: buildPatientMessage(eventForStatus(appointment.status), appointment, origin),
+  };
+}
+
 async function listAppointments(db, request) {
   const url = new URL(request.url);
   const conditions = [];
@@ -247,7 +284,7 @@ async function listAppointments(db, request) {
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const result = await db.prepare(`
-    SELECT a.*, b.name AS branch_name, s.name AS service_name
+    SELECT ${APPOINTMENT_COLUMNS}
     FROM appointments a
     JOIN branches b ON b.id = a.branch_id
     JOIN services s ON s.id = a.service_id
@@ -256,12 +293,7 @@ async function listAppointments(db, request) {
     LIMIT 200
   `).bind(...params).all();
   const origin = new URL(request.url).origin;
-  return (result.results || []).map((appointment) => ({
-    ...appointment,
-    review_url: appointment.review_token
-      ? `${origin}/?review=${appointment.review_token}#reviews`
-      : null,
-  }));
+  return (result.results || []).map((appointment) => withPatientMessage(appointment, origin));
 }
 
 async function updateAppointment(context, appointmentId) {
@@ -269,7 +301,7 @@ async function updateAppointment(context, appointmentId) {
   const status = oneOf(body.status, APPOINTMENT_STATUSES, 'Appointment status');
   const adminNotes = text(body.adminNotes, 'Admin notes', { max: 500, optional: true });
   const existing = await context.env.DB
-    .prepare('SELECT id, review_token FROM appointments WHERE id = ?')
+    .prepare('SELECT id, status, review_token FROM appointments WHERE id = ?')
     .bind(appointmentId)
     .first();
   if (!existing) throw new ApiError(404, 'APPOINTMENT_NOT_FOUND', 'Appointment was not found.');
@@ -288,22 +320,43 @@ async function updateAppointment(context, appointmentId) {
     throw error;
   }
   await writeAudit(context.env.DB, 'appointment.status_updated', 'appointment', appointmentId, { status });
-  const updated = await context.env.DB.prepare(`
-    SELECT a.*, b.name AS branch_name, s.name AS service_name
+  const origin = new URL(context.request.url).origin;
+  let notification = { sent: false, skipped: true };
+  if (status !== existing.status) {
+    const appointment = await loadAppointmentForMessage(context.env.DB, appointmentId);
+    notification = await sendPatientWhatsApp(context.env, appointment, eventForStatus(status), origin);
+  }
+  return { appointment: await getAppointment(context.env.DB, appointmentId, origin), notification };
+}
+
+async function getAppointment(db, appointmentId, origin) {
+  const appointment = await db.prepare(`
+    SELECT ${APPOINTMENT_COLUMNS}
     FROM appointments a
     JOIN branches b ON b.id = a.branch_id
     JOIN services s ON s.id = a.service_id
     WHERE a.id = ?
   `).bind(appointmentId).first();
-  return {
-    ...updated,
-    review_url: reviewToken ? `${new URL(context.request.url).origin}/?review=${reviewToken}#reviews` : null,
-  };
+  return appointment ? withPatientMessage(appointment, origin) : null;
+}
+
+async function resendPatientMessage(context, appointmentId) {
+  const appointment = await loadAppointmentForMessage(context.env.DB, appointmentId);
+  if (!appointment) throw new ApiError(404, 'APPOINTMENT_NOT_FOUND', 'Appointment was not found.');
+  if (!isWhatsAppConfigured(context.env)) {
+    throw new ApiError(503, 'WHATSAPP_NOT_CONFIGURED', 'Automatic WhatsApp is not configured. Use the WhatsApp button to send manually.');
+  }
+  const origin = new URL(context.request.url).origin;
+  const notification = await sendPatientWhatsApp(context.env, appointment, eventForStatus(appointment.status), origin);
+  if (notification.skipped) {
+    throw new ApiError(400, 'NO_MESSAGE_FOR_STATUS', 'There is no automatic WhatsApp message for this appointment status.');
+  }
+  return { appointment: await getAppointment(context.env.DB, appointmentId, origin), notification };
 }
 
 async function getSchedule(db) {
   const [branchesResult, hoursResult, servicesResult] = await db.batch([
-    db.prepare('SELECT id, name, address, phone, timezone, active FROM branches ORDER BY name'),
+    db.prepare('SELECT id, name, address, phone, timezone, active, google_review_url FROM branches ORDER BY name'),
     db.prepare(`
       SELECT id, branch_id, day_of_week, period_index, start_time, end_time, slot_minutes, active
       FROM working_hours ORDER BY branch_id, day_of_week, period_index
@@ -627,14 +680,34 @@ async function routeAdmin(context, path) {
         && Boolean(context.env.FIREBASE_SERVICE_ACCOUNT_JSON),
     });
   }
-  if (path === 'admin/dashboard' && method === 'GET') return json(await dashboard(DB));
+  if (path === 'admin/dashboard' && method === 'GET') {
+    return json({ ...await dashboard(DB), patientWhatsApp: isWhatsAppConfigured(context.env) });
+  }
   if (path === 'admin/appointments' && method === 'GET') return json({ appointments: await listAppointments(DB, context.request) });
   if (path === 'admin/appointments/export' && method === 'GET') return exportAppointments(DB, context.request);
 
   const appointmentMatch = path.match(/^admin\/appointments\/([a-zA-Z0-9-]+)$/);
   if (appointmentMatch) {
     if (method !== 'PATCH') return methodNotAllowed(['PATCH']);
-    return json({ appointment: await updateAppointment(context, appointmentMatch[1]) });
+    return json(await updateAppointment(context, appointmentMatch[1]));
+  }
+  const notifyMatch = path.match(/^admin\/appointments\/([a-zA-Z0-9-]+)\/notify$/);
+  if (notifyMatch) {
+    if (method !== 'POST') return methodNotAllowed(['POST']);
+    return json(await resendPatientMessage(context, notifyMatch[1]));
+  }
+
+  const branchMatch = path.match(/^admin\/branches\/([a-zA-Z0-9_-]+)$/);
+  if (branchMatch) {
+    if (method !== 'PATCH') return methodNotAllowed(['PATCH']);
+    const body = await readJson(context.request);
+    const url = validateGoogleReviewUrl(body.googleReviewUrl);
+    const result = await DB.prepare(`
+      UPDATE branches SET google_review_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(url, branchMatch[1]).run();
+    if (!result.meta.changes) throw new ApiError(404, 'BRANCH_NOT_FOUND', 'Clinic branch was not found.');
+    await writeAudit(DB, 'branch.review_link_updated', 'branch', branchMatch[1]);
+    return json({ updated: true });
   }
 
   if (path === 'admin/schedule' && method === 'GET') return json(await getSchedule(DB));

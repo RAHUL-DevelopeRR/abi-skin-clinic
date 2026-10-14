@@ -12,7 +12,15 @@ D1 database and secure server-side session as the web dashboard.
 - Clinic calling, Google Maps navigation and review listing access
 - 30-second foreground monitoring, refresh on app resume and network status
 - Firebase background notifications with no patient information in the alert
+- One-tap WhatsApp/SMS messages to patients and automatic WhatsApp status
+  (see [NOTIFICATIONS.md](NOTIFICATIONS.md))
+- Editable Google review link per clinic
+- Offline screen with automatic retry instead of a browser error page
 - Screenshot blocking, disabled Android backups and HTTPS-only traffic
+
+The app loads `https://abiskinandhaircare.in/admin`, so dashboard changes go
+live with a website deploy. Rebuild the APK only for native changes
+(`capacitor.config.json`, `android/`, plugins).
 
 ## Build
 

@@ -49,6 +49,23 @@ export function phone(value) {
   return local;
 }
 
+const GOOGLE_REVIEW_HOSTS = ['g.page', 'google.com', 'www.google.com', 'search.google.com', 'maps.google.com', 'maps.app.goo.gl', 'goo.gl'];
+
+export function googleReviewUrl(value) {
+  const normalized = text(value, 'Google review link', { max: 500, optional: true });
+  if (!normalized) return '';
+  let url;
+  try {
+    url = new URL(normalized);
+  } catch {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Google review link must be a valid URL.');
+  }
+  if (url.protocol !== 'https:' || !GOOGLE_REVIEW_HOSTS.includes(url.hostname)) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Paste the https:// review link from your Google Business Profile.');
+  }
+  return url.toString();
+}
+
 export function integer(value, field, { min, max }) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < min || parsed > max) {

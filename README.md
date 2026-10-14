@@ -9,6 +9,7 @@ Clinic website and appointment operations system built with React, Cloudflare Pa
 - `/admin` is password protected and lets clinic staff manage appointment statuses, working days and periods, leave days, services, and review moderation.
 - A completed appointment receives a one-time review token. Only approved reviews are public.
 - Patient appointment status can be checked with the booking reference and registered phone number.
+- Patients are acknowledged on WhatsApp automatically (WhatsApp Cloud API) or by one-tap WhatsApp/SMS from the doctor app. See `NOTIFICATIONS.md`.
 
 ## Local development
 
@@ -31,6 +32,8 @@ The GitHub workflow deploys the Pages project and applies D1 migrations. Configu
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 - `ADMIN_PASSWORD` (at least 12 characters; use a long unique value)
+
+The workflow applies D1 migrations first, then deploys to the Pages production branch `main`. For a manual deploy run `npm run deploy` (it passes `--branch=main`; without it, a deploy from `master` only creates a preview).
 
 The D1 binding is named `DB`. Wrangler can provision `abi-skin-clinic-db` from `wrangler.jsonc` during the first deployment. Confirm the generated database binding and migration step in the first workflow run.
 

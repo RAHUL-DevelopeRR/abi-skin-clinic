@@ -51,7 +51,7 @@ export default function Booking() {
     setLoading(true);
     try {
       const result = await api('/api/public/appointments', { method: 'POST', body: JSON.stringify(form) });
-      setBooking(result.appointment);
+      setBooking({ ...result.appointment, phone: digits, whatsappAcknowledgement: result.whatsappAcknowledgement });
     } catch (requestError) {
       setError(requestError.message);
       if (requestError.code === 'SLOT_UNAVAILABLE') setForm((current) => ({ ...current, timeSlot: '' }));
@@ -78,7 +78,7 @@ export default function Booking() {
           {booking ? (
             <div className="text-center py-6 space-y-6" aria-live="polite">
               <CheckCircle2 className="w-16 h-16 mx-auto text-teal-600" />
-              <div><h3 className="text-2xl font-extrabold">Appointment request received</h3><p className="mt-2 text-sm text-slate-500">The clinic will confirm it. This screen does not claim medical confirmation.</p></div>
+              <div><h3 className="text-2xl font-extrabold">Appointment request received</h3><p className="mt-2 text-sm text-slate-500">{booking.whatsappAcknowledgement ? `A WhatsApp acknowledgement is being sent to +91 ${booking.phone}. ` : ''}The clinic will confirm the appointment{booking.whatsappAcknowledgement ? ' on WhatsApp' : ' by phone or WhatsApp'}. Save your reference number to track it.</p></div>
               <div className="max-w-md mx-auto text-left rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-6 text-sm space-y-2">
                 <p><strong>Reference:</strong> <span className="text-teal-600">{booking.reference}</span></p><p><strong>Treatment:</strong> {booking.service}</p><p><strong>Date:</strong> {booking.date} at {formatTime(booking.timeSlot)}</p><p><strong>Status:</strong> Awaiting clinic confirmation</p>
               </div>

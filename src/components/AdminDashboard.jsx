@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2, ClipboardList, Clock3, Copy, LayoutDashboard,
-  ExternalLink, LoaderCircle, LogOut, MapPinned, MessageSquareQuote, Navigation,
-  Palmtree, RefreshCw, Save, ShieldCheck, Trash2, Wifi, WifiOff, XCircle,
+  ExternalLink, LoaderCircle, LogOut, MapPinned, MessageCircle, MessageSquareQuote, MessageSquareText,
+  Navigation, Palmtree, Phone, RefreshCw, Save, Send, ShieldCheck, Star, Trash2, Wifi, WifiOff, XCircle,
 } from 'lucide-react';
 import { api, formatTime, getLocalDateString } from '../lib/api';
 import {
-  enableAppointmentNotifications, isNativeApp, monitorNativeApp,
+  copyText, enableAppointmentNotifications, externalLinkProps, isNativeApp, monitorNativeApp,
   notifyNewAppointments, openExternal, registerPushNotifications,
 } from '../lib/native';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const STATUSES = ['requested', 'confirmed', 'completed', 'cancelled', 'no_show'];
+const STATUS_LABELS = { requested: 'Requested', confirmed: 'Confirmed', completed: 'Completed', cancelled: 'Cancelled', no_show: 'No-show' };
 const TABS = [
   ['overview', 'Overview', LayoutDashboard],
   ['appointments', 'Appointments', ClipboardList],
@@ -63,7 +64,7 @@ function Login({ onLogin }) {
         </label>
         {error && <p className="mt-4 text-sm text-red-400" role="alert">{error}</p>}
         <button disabled={loading} className="mt-6 w-full rounded-xl bg-teal-600 px-5 py-3.5 font-bold disabled:opacity-50">{loading ? 'Signing in…' : 'Sign in'}</button>
-        <a href="/" className="mt-5 block text-center text-xs text-slate-500 hover:text-white">Return to clinic website</a>
+        {!isNativeApp && <a href="/" className="mt-5 block text-center text-xs text-slate-500 hover:text-white">Return to clinic website</a>}
       </form>
     </main>
   );
@@ -72,14 +73,45 @@ function Login({ onLogin }) {
 function Overview({ data }) {
   const stats = data?.stats || {};
   const cards = [['Today', stats.today], ['New requests', stats.requested], ['Upcoming confirmed', stats.upcomingConfirmed], ['Completed', stats.completed], ['Reviews pending', stats.pendingReviews]];
-  return <div className="space-y-8"><div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-4">{cards.map(([label, value]) => <div key={label} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"><p className="text-xs font-bold uppercase text-slate-500">{label}</p><p className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">{value || 0}</p></div>)}</div><div><h2 className="text-xl font-bold mb-4">Latest appointment requests</h2>{data?.recentAppointments?.length ? <div className="space-y-3">{data.recentAppointments.map((item) => <div key={item.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-wrap justify-between gap-3"><div><strong>{item.patient_name}</strong><p className="text-xs text-slate-500">{item.reference} · {item.service_name}</p></div><div className="text-right text-sm"><p>{item.appointment_date} · {formatTime(item.time_slot)}</p><span className={`inline-block mt-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase ${statusClass(item.status)}`}>{item.status}</span></div></div>)}</div> : <Empty>No appointments yet.</Empty>}</div></div>;
+  return <div className="space-y-8"><div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-4">{cards.map(([label, value]) => <div key={label} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"><p className="text-xs font-bold uppercase text-slate-500">{label}</p><p className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">{value || 0}</p></div>)}</div><div><h2 className="text-xl font-bold mb-4">Latest appointment requests</h2>{data?.recentAppointments?.length ? <div className="space-y-3">{data.recentAppointments.map((item) => <div key={item.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-wrap justify-between gap-3"><div><strong>{item.patient_name}</strong><p className="text-xs text-slate-500">{item.reference} · {item.service_name}</p></div><div className="text-right text-sm"><p>{item.appointment_date} · {formatTime(item.time_slot)}</p><span className={`inline-block mt-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase ${statusClass(item.status)}`}>{STATUS_LABELS[item.status] || item.status}</span></div></div>)}</div> : <Empty>No appointments yet.</Empty>}</div></div>;
 }
 
-function Appointments({ appointments, onUpdate }) {
+function NotificationBadge({ notification, autoEnabled }) {
+  if (notification) {
+    const sent = notification.status === 'sent';
+    const time = new Date(`${notification.created_at.replace(' ', 'T')}Z`).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return <p title={notification.error || ''} className={`text-[11px] font-semibold ${sent ? 'text-green-600' : 'text-red-500'}`}>{sent ? '✓ WhatsApp sent' : '✗ WhatsApp failed'} ({notification.event}) · {time}</p>;
+  }
+  return <p className="text-[11px] text-slate-500">{autoEnabled ? 'No WhatsApp sent yet' : 'Auto-WhatsApp off · send manually'}</p>;
+}
+
+function AppointmentCard({ item, autoWhatsApp, onUpdate, onResend, onCopy }) {
+  const message = item.patient_message || '';
+  return <article className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0"><strong className="block truncate">{item.patient_name}</strong><p className="text-xs text-slate-500">{item.reference}</p></div>
+      <select aria-label="Appointment status" value={item.status} onChange={(event) => onUpdate(item, event.target.value)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${statusClass(item.status)}`}>{STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select>
+    </div>
+    <p className="mt-3 text-sm font-semibold">{item.appointment_date} · {formatTime(item.time_slot)}</p>
+    <p className="text-xs text-slate-500">{item.service_name} · {item.branch_name}</p>
+    {item.notes && <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300">{item.notes}</p>}
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><a href={`tel:+91${item.phone}`} className="inline-flex items-center gap-1 text-sm font-semibold text-teal-600"><Phone className="h-4 w-4" />+91 {item.phone}</a><NotificationBadge notification={item.last_notification} autoEnabled={autoWhatsApp} /></div>
+    {message && <div className="mt-3 grid grid-cols-2 gap-2">
+      <a {...externalLinkProps(`https://wa.me/91${item.phone}?text=${encodeURIComponent(message)}`)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-3 py-2.5 text-xs font-bold text-white"><MessageCircle className="h-4 w-4" />WhatsApp</a>
+      <a {...externalLinkProps(`sms:+91${item.phone}?body=${encodeURIComponent(message)}`)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold dark:border-slate-700"><MessageSquareText className="h-4 w-4" />SMS</a>
+    </div>}
+    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+      {autoWhatsApp && item.status !== 'no_show' && <button type="button" onClick={() => onResend(item)} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-teal-600"><Send className="h-3 w-3" />Resend automatic WhatsApp</button>}
+      {item.status === 'completed' && item.google_review_link && <button type="button" onClick={() => onCopy(item.google_review_link)} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-teal-600"><Copy className="h-3 w-3" />Copy Google review link</button>}
+    </div>
+  </article>;
+}
+
+function Appointments({ appointments, autoWhatsApp, onUpdate, onResend, onCopy }) {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const filtered = appointments.filter((item) => (filter === 'all' || item.status === filter) && [item.patient_name, item.reference, item.phone].some((value) => String(value).toLowerCase().includes(search.toLowerCase())));
-  return <div><div className="mb-5 flex flex-col sm:flex-row gap-3"><input placeholder="Search patient, phone or reference" value={search} onChange={(event) => setSearch(event.target.value)} className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3" /><select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3"><option value="all">All statuses</option>{STATUSES.map((status) => <option key={status}>{status}</option>)}</select></div>{filtered.length ? <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800"><table className="w-full min-w-[900px] text-sm"><thead className="bg-slate-100 dark:bg-slate-900 text-left text-xs uppercase text-slate-500"><tr><th className="p-4">Patient</th><th className="p-4">Appointment</th><th className="p-4">Treatment</th><th className="p-4">Status</th><th className="p-4">Contact / review</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id} className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 align-top"><td className="p-4"><strong>{item.patient_name}</strong><p className="text-xs text-slate-500">{item.reference}</p>{item.notes && <p className="mt-2 max-w-xs text-xs text-slate-500">{item.notes}</p>}</td><td className="p-4">{item.appointment_date}<br />{formatTime(item.time_slot)}<p className="text-xs text-slate-500">{item.branch_name}</p></td><td className="p-4">{item.service_name}</td><td className="p-4"><select value={item.status} onChange={(event) => onUpdate(item, event.target.value)} className={`rounded-lg px-3 py-2 text-xs font-bold ${statusClass(item.status)}`}>{STATUSES.map((status) => <option key={status}>{status}</option>)}</select></td><td className="p-4"><a href={`tel:+91${item.phone}`} className="text-teal-600 font-semibold">+91 {item.phone}</a>{item.review_url && <button type="button" onClick={() => navigator.clipboard.writeText(item.review_url)} className="mt-3 flex items-center gap-1 text-xs text-slate-500 hover:text-teal-600"><Copy className="w-3 h-3" />Copy verified review invite</button>}</td></tr>)}</tbody></table></div> : <Empty>No matching appointments.</Empty>}</div>;
+  return <div><div className="mb-5 flex flex-col sm:flex-row gap-3"><input placeholder="Search patient, phone or reference" value={search} onChange={(event) => setSearch(event.target.value)} className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3" /><select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3"><option value="all">All statuses</option>{STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select></div>{filtered.length ? <div className="grid gap-3 lg:grid-cols-2">{filtered.map((item) => <AppointmentCard key={item.id} item={item} autoWhatsApp={autoWhatsApp} onUpdate={onUpdate} onResend={onResend} onCopy={onCopy} />)}</div> : <Empty>No matching appointments.</Empty>}</div>;
 }
 
 function Schedule({ data, onSave, onToggleService }) {
@@ -106,22 +138,43 @@ function Leaves({ leaves, branches, onCreate, onDelete }) {
   return <div className="space-y-6"><form onSubmit={(event) => { event.preventDefault(); onCreate(form); }} className="grid md:grid-cols-4 gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"><input required type="date" min={getLocalDateString()} value={form.date} onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-3" /><select value={form.branchId} onChange={(event) => setForm((current) => ({ ...current, branchId: event.target.value }))} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-3"><option value="">All branches</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select><input required minLength="2" maxLength="200" value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-3" /><button className="rounded-xl bg-teal-600 text-white font-bold">Add leave day</button></form>{leaves.length ? <div className="space-y-3">{leaves.map((leave) => <div key={leave.id} className="flex justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4"><div><strong>{leave.leave_date}</strong><p className="text-xs text-slate-500">{leave.branch_name || 'All branches'} · {leave.reason}</p></div><button onClick={() => onDelete(leave.id)} className="text-red-500"><Trash2 className="w-5 h-5" /></button></div>)}</div> : <Empty>No leave days configured.</Empty>}</div>;
 }
 
-function Clinics({ branches }) {
-  return <div className="grid gap-4 lg:grid-cols-2">{branches.map((branch) => {
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${branch.name}, ${branch.address}`)}`;
-    return <article key={branch.id} className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-start gap-3"><MapPinned className="mt-1 h-6 w-6 shrink-0 text-teal-600" /><div><h2 className="font-extrabold">{branch.name}</h2><p className="mt-1 text-sm leading-6 text-slate-500">{branch.address}</p></div></div>
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <button type="button" onClick={() => openExternal(mapsUrl)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-3 text-sm font-bold text-white"><Navigation className="h-4 w-4" />Navigate</button>
-        <a href={`tel:${branch.phone}`} className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold dark:border-slate-700">Call clinic</a>
-      </div>
-      <button type="button" onClick={() => openExternal(mapsUrl)} className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-teal-600">Open Google Maps and reviews <ExternalLink className="h-4 w-4" /></button>
-    </article>;
-  })}</div>;
+function ClinicCard({ branch, onSaveReviewLink }) {
+  const [reviewLink, setReviewLink] = useState(branch.google_review_url || '');
+  useEffect(() => setReviewLink(branch.google_review_url || ''), [branch.google_review_url]);
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${branch.name}, ${branch.address}`)}`;
+  return <article className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+    <div className="flex items-start gap-3"><MapPinned className="mt-1 h-6 w-6 shrink-0 text-teal-600" /><div><h2 className="font-extrabold">{branch.name}</h2><p className="mt-1 text-sm leading-6 text-slate-500">{branch.address}</p></div></div>
+    <div className="mt-5 grid grid-cols-2 gap-3">
+      <button type="button" onClick={() => openExternal(mapsUrl)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-3 text-sm font-bold text-white"><Navigation className="h-4 w-4" />Navigate</button>
+      <a href={`tel:${branch.phone}`} className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold dark:border-slate-700">Call clinic</a>
+    </div>
+    {branch.google_review_url && <button type="button" onClick={() => openExternal(branch.google_review_url)} className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-teal-600">Open Google reviews <ExternalLink className="h-4 w-4" /></button>}
+    <form onSubmit={(event) => { event.preventDefault(); onSaveReviewLink(branch.id, reviewLink); }} className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800">
+      <label className="block text-xs font-bold uppercase text-slate-500"><Star className="mr-1 inline h-3 w-3" />Google review link
+        <input type="url" value={reviewLink} onChange={(event) => setReviewLink(event.target.value)} placeholder="https://g.page/r/…/review" className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm normal-case dark:border-slate-700 dark:bg-slate-950" />
+      </label>
+      <p className="mt-2 text-xs text-slate-500">Patients see this after submitting a verified review. Get it from Google Business Profile → Ask for reviews.</p>
+      <button className="mt-3 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white dark:bg-white dark:text-slate-950">Save link</button>
+    </form>
+  </article>;
 }
 
-function ReviewsAdmin({ reviews, onModerate, onDelete }) {
-  return reviews.length ? <div className="grid lg:grid-cols-2 gap-4">{reviews.map((review) => <article key={review.id} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"><div className="flex justify-between gap-3"><div><strong>{review.patient_name}</strong><p className="text-xs text-slate-500">{review.reference} · {review.rating}/5</p></div><span className={`h-fit px-2 py-1 rounded-full text-[10px] font-bold uppercase ${statusClass(review.status)}`}>{review.status}</span></div><p className="my-4 text-sm text-slate-600 dark:text-slate-300">“{review.comment}”</p><div className="flex gap-2"><button onClick={() => onModerate(review.id, 'approved')} className="inline-flex items-center gap-1 rounded-lg bg-green-100 text-green-700 px-3 py-2 text-xs font-bold"><CheckCircle2 className="w-4 h-4" />Approve</button><button onClick={() => onModerate(review.id, 'rejected')} className="inline-flex items-center gap-1 rounded-lg bg-red-100 text-red-700 px-3 py-2 text-xs font-bold"><XCircle className="w-4 h-4" />Reject</button><button onClick={() => onDelete(review.id)} className="ml-auto text-red-500"><Trash2 className="w-4 h-4" /></button></div></article>)}</div> : <Empty>No submitted reviews.</Empty>;
+function Clinics({ branches, onSaveReviewLink }) {
+  return <div className="grid gap-4 lg:grid-cols-2">{branches.map((branch) => <ClinicCard key={branch.id} branch={branch} onSaveReviewLink={onSaveReviewLink} />)}</div>;
+}
+
+function GoogleReviewLinks({ branches }) {
+  const linked = branches.filter((branch) => branch.google_review_url);
+  if (!linked.length) return null;
+  return <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+    <h2 className="flex items-center gap-2 font-extrabold"><Star className="h-5 w-5 fill-amber-400 text-amber-400" />Review us on Google</h2>
+    <p className="mt-1 text-xs text-slate-500">Opens each clinic's Google reviews. Completed patients get this link in their WhatsApp/SMS message.</p>
+    <div className="mt-4 grid gap-2 sm:grid-cols-2">{linked.map((branch) => <button key={branch.id} type="button" onClick={() => openExternal(branch.google_review_url)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white dark:bg-white dark:text-slate-950">{branch.name}<ExternalLink className="h-4 w-4" /></button>)}</div>
+  </section>;
+}
+
+function ReviewsAdmin({ reviews, branches, onModerate, onDelete }) {
+  return <><GoogleReviewLinks branches={branches} />{reviews.length ? <div className="grid lg:grid-cols-2 gap-4">{reviews.map((review) => <article key={review.id} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"><div className="flex justify-between gap-3"><div><strong>{review.patient_name}</strong><p className="text-xs text-slate-500">{review.reference} · {review.rating}/5</p></div><span className={`h-fit px-2 py-1 rounded-full text-[10px] font-bold uppercase ${statusClass(review.status)}`}>{review.status}</span></div><p className="my-4 text-sm text-slate-600 dark:text-slate-300">“{review.comment}”</p><div className="flex gap-2"><button onClick={() => onModerate(review.id, 'approved')} className="inline-flex items-center gap-1 rounded-lg bg-green-100 text-green-700 px-3 py-2 text-xs font-bold"><CheckCircle2 className="w-4 h-4" />Approve</button><button onClick={() => onModerate(review.id, 'rejected')} className="inline-flex items-center gap-1 rounded-lg bg-red-100 text-red-700 px-3 py-2 text-xs font-bold"><XCircle className="w-4 h-4" />Reject</button><button onClick={() => onDelete(review.id)} className="ml-auto text-red-500"><Trash2 className="w-4 h-4" /></button></div></article>)}</div> : <Empty>No website reviews yet.</Empty>}</>;
 }
 
 export default function AdminDashboard() {
@@ -186,11 +239,23 @@ export default function AdminDashboard() {
     }, 30_000);
     return () => { window.clearInterval(timer); stopMonitoring(); stopPushNotifications(); };
   }, [authenticated, load]);
-  async function act(operation, success) { setError(''); setMessage(''); try { await operation(); setMessage(success); await load(); } catch (requestError) { setError(requestError.message); } }
-  async function logout() { await api('/api/admin/logout', { method: 'POST', body: '{}' }); setAuthenticated(false); }
+  async function act(operation, success) { setError(''); setMessage(''); try { const result = await operation(); setMessage(typeof success === 'function' ? success(result) : success); await load({ silent: true }); } catch (requestError) { setError(requestError.message); } }
+  async function logout() { try { await api('/api/admin/logout', { method: 'POST', body: '{}' }); setAuthenticated(false); } catch (requestError) { setError(requestError.message); } }
+  async function copy(value) { setError(''); if (await copyText(value)) setMessage('Google review link copied.'); else setError('Could not copy. Long-press the link to copy it manually.'); }
+  function notificationMessage(base, notification) {
+    if (notification?.sent) return `${base} WhatsApp sent to the patient.`;
+    if (notification?.error) return `${base} Automatic WhatsApp failed (${notification.error}). Use the WhatsApp button to send manually.`;
+    return `${base} Tap WhatsApp or SMS on the appointment to inform the patient.`;
+  }
+  function updateStatus(item, status) {
+    return act(() => api(`/api/admin/appointments/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status, adminNotes: item.admin_notes || '' }) }), (result) => notificationMessage('Appointment updated.', result.notification));
+  }
+  function resendWhatsApp(item) {
+    return act(() => api(`/api/admin/appointments/${item.id}/notify`, { method: 'POST', body: '{}' }), (result) => notificationMessage('', result.notification).trim());
+  }
 
   if (authenticated === null) return <main className="min-h-screen bg-slate-950 text-white"><Loading /></main>;
   if (!authenticated) return <Login onLogin={() => { setAuthenticated(true); load(); }} />;
 
-  return <main className="min-h-screen bg-slate-50 pb-[env(safe-area-inset-bottom)] text-slate-900 dark:bg-slate-950 dark:text-slate-100"><header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3"><div><h1 className="text-lg font-extrabold sm:text-xl">ABI Doctor Dashboard</h1><p className={`flex items-center gap-1 text-xs ${connected ? 'text-teal-600' : 'text-red-500'}`}>{connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}{connected ? `Live${lastSynced ? ` · synced ${lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}` : 'Offline'}</p></div><div className="flex gap-2"><button onClick={() => load()} className="rounded-xl bg-slate-100 p-2.5 dark:bg-slate-900" aria-label="Refresh"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button><button onClick={logout} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-950"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Logout</span></button></div></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6"><nav className="mb-6 flex gap-2 overflow-x-auto pb-3">{TABS.map(([id, label, Icon]) => <button key={id} onClick={() => setTab(id)} className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'}`}><Icon className="h-4 w-4" />{label}</button>)}</nav>{message && <p className="mb-5 rounded-xl bg-green-100 p-3 text-sm text-green-700">{message}</p>}{error && <p className="mb-5 rounded-xl bg-red-100 p-3 text-sm text-red-700" role="alert">{error}</p>}{loading && !data.dashboard ? <Loading /> : <>{tab === 'overview' && <Overview data={data.dashboard} />}{tab === 'appointments' && <Appointments appointments={data.appointments} onUpdate={(item, status) => act(() => api(`/api/admin/appointments/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status, adminNotes: item.admin_notes || '' }) }), 'Appointment updated.')} />}{tab === 'schedule' && <Schedule data={data.schedule} onSave={(branchId, periods) => act(() => api(`/api/admin/schedule/${branchId}`, { method: 'PUT', body: JSON.stringify({ periods }) }), 'Working schedule saved.')} onToggleService={(id, active) => act(() => api(`/api/admin/services/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) }), 'Service availability updated.')} />}{tab === 'leaves' && <Leaves leaves={data.leaves} branches={data.schedule.branches} onCreate={(form) => act(() => api('/api/admin/leaves', { method: 'POST', body: JSON.stringify(form) }), 'Leave day added; public slots are updated.')} onDelete={(id) => act(() => api(`/api/admin/leaves/${id}`, { method: 'DELETE' }), 'Leave day removed.')} />}{tab === 'reviews' && <ReviewsAdmin reviews={data.reviews} onModerate={(id, status) => act(() => api(`/api/admin/reviews/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }), 'Review moderated.')} onDelete={(id) => act(() => api(`/api/admin/reviews/${id}`, { method: 'DELETE' }), 'Review deleted.')} />}{tab === 'clinics' && <Clinics branches={data.schedule.branches} />}</>}</div></main>;
+  return <main className="min-h-screen bg-slate-50 pb-[env(safe-area-inset-bottom)] text-slate-900 dark:bg-slate-950 dark:text-slate-100"><header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3"><div><h1 className="text-lg font-extrabold sm:text-xl">ABI Doctor Dashboard</h1><p className={`flex items-center gap-1 text-xs ${connected ? 'text-teal-600' : 'text-red-500'}`}>{connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}{connected ? `Live${lastSynced ? ` · synced ${lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}` : 'Offline'}</p></div><div className="flex gap-2"><button onClick={() => load()} className="rounded-xl bg-slate-100 p-2.5 dark:bg-slate-900" aria-label="Refresh"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button><button onClick={logout} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-950"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Logout</span></button></div></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6"><nav className="mb-6 flex gap-2 overflow-x-auto pb-3">{TABS.map(([id, label, Icon]) => <button key={id} onClick={() => setTab(id)} className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'}`}><Icon className="h-4 w-4" />{label}</button>)}</nav>{message && <p className="mb-5 rounded-xl bg-green-100 p-3 text-sm text-green-700">{message}</p>}{error && <p className="mb-5 rounded-xl bg-red-100 p-3 text-sm text-red-700" role="alert">{error}</p>}{loading && !data.dashboard ? <Loading /> : <>{tab === 'overview' && <Overview data={data.dashboard} />}{tab === 'appointments' && <Appointments appointments={data.appointments} autoWhatsApp={Boolean(data.dashboard?.patientWhatsApp)} onUpdate={updateStatus} onResend={resendWhatsApp} onCopy={copy} />}{tab === 'schedule' && <Schedule data={data.schedule} onSave={(branchId, periods) => act(() => api(`/api/admin/schedule/${branchId}`, { method: 'PUT', body: JSON.stringify({ periods }) }), 'Working schedule saved.')} onToggleService={(id, active) => act(() => api(`/api/admin/services/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) }), 'Service availability updated.')} />}{tab === 'leaves' && <Leaves leaves={data.leaves} branches={data.schedule.branches} onCreate={(form) => act(() => api('/api/admin/leaves', { method: 'POST', body: JSON.stringify(form) }), 'Leave day added; public slots are updated.')} onDelete={(id) => act(() => api(`/api/admin/leaves/${id}`, { method: 'DELETE' }), 'Leave day removed.')} />}{tab === 'reviews' && <ReviewsAdmin reviews={data.reviews} branches={data.schedule.branches} onModerate={(id, status) => act(() => api(`/api/admin/reviews/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }), 'Review moderated.')} onDelete={(id) => act(() => api(`/api/admin/reviews/${id}`, { method: 'DELETE' }), 'Review deleted.')} />}{tab === 'clinics' && <Clinics branches={data.schedule.branches} onSaveReviewLink={(id, googleReviewUrl) => act(() => api(`/api/admin/branches/${id}`, { method: 'PATCH', body: JSON.stringify({ googleReviewUrl }) }), 'Google review link saved.')} />}</>}</div></main>;
 }

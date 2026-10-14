@@ -1,3 +1,6 @@
 # Copy this file to .dev.vars for local development.
 # Set the production value as an encrypted Cloudflare Pages secret.
 ADMIN_PASSWORD="replace-with-a-long-unique-password"
+# Optional: automatic patient WhatsApp messages (see NOTIFICATIONS.md).
+# WHATSAPP_ACCESS_TOKEN="replace-with-system-user-token"
+# WHATSAPP_PHONE_NUMBER_ID="replace-with-phone-number-id"
