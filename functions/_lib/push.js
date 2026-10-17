@@ -49,34 +49,54 @@ async function getAccessToken(serviceAccount) {
   return (await response.json()).access_token;
 }
 
-export async function sendNewAppointmentNotification(env) {
-  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) return;
+async function sendFirebaseMessages(env, messages) {
   const serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
-  const devices = await env.DB.prepare(`
-    SELECT token FROM doctor_devices ORDER BY updated_at DESC LIMIT 20
-  `).all();
-  if (!devices.results?.length) return;
   const accessToken = await getAccessToken(serviceAccount);
   const endpoint = `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`;
-  await Promise.all(devices.results.map(async ({ token }) => {
+  return Promise.all(messages.map(async (message) => {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        message: {
-          token,
-          notification: {
-            title: 'New appointment request',
-            body: 'Open ABI Doctor to review the latest request.',
-          },
-          android: { priority: 'high', notification: { channel_id: 'appointments' } },
-          data: { route: '/admin' },
-        },
-      }),
+      body: JSON.stringify({ message }),
     });
+    return { token: message.token, response };
+  }));
+}
+
+/**
+ * Silent, high-priority data message telling the registered clinic phone that SMS jobs
+ * are waiting. It carries no patient details; the phone fetches them over HTTPS.
+ */
+export async function sendSmsWakeUp(env, token) {
+  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON || !token) return false;
+  const [{ response }] = await sendFirebaseMessages(env, [{
+    token,
+    data: { type: 'sms_jobs' },
+    android: { priority: 'high', ttl: '3600s' },
+  }]);
+  if (!response.ok) console.error('SMS wake-up delivery failed.', response.status);
+  return response.ok;
+}
+
+export async function sendNewAppointmentNotification(env) {
+  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) return;
+  const devices = await env.DB.prepare(`
+    SELECT token FROM doctor_devices ORDER BY updated_at DESC LIMIT 20
+  `).all();
+  if (!devices.results?.length) return;
+  const results = await sendFirebaseMessages(env, devices.results.map(({ token }) => ({
+    token,
+    notification: {
+      title: 'New appointment request',
+      body: 'Open ABI Doctor to review the latest request.',
+    },
+    android: { priority: 'high', notification: { channel_id: 'appointments' } },
+    data: { route: '/admin' },
+  })));
+  await Promise.all(results.map(async ({ token, response }) => {
     if (response.status === 404) {
       // The app was uninstalled or the token rotated; stop sending to it.
       await env.DB.prepare('DELETE FROM doctor_devices WHERE token = ?').bind(token).run();

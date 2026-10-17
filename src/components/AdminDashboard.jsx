@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2, ClipboardList, Clock3, Copy, LayoutDashboard,
   ExternalLink, LoaderCircle, LogOut, MapPinned, MessageCircle, MessageSquareQuote, MessageSquareText,
-  Navigation, Palmtree, Phone, RefreshCw, Save, Send, ShieldCheck, Star, Trash2, Wifi, WifiOff, XCircle,
+  Navigation, Palmtree, Phone, RefreshCw, Save, Send, ShieldCheck, Smartphone, Star, Trash2, Wifi, WifiOff, XCircle,
 } from 'lucide-react';
+import { App } from '@capacitor/app';
 import { api, formatTime, getLocalDateString } from '../lib/api';
 import {
-  copyText, enableAppointmentNotifications, externalLinkProps, isNativeApp, monitorNativeApp,
-  notifyNewAppointments, openExternal, registerPushNotifications,
+  copyText, enableAppointmentNotifications, externalLinkProps, getPushToken, hasSmsGateway, isNativeApp, monitorNativeApp,
+  notifyNewAppointments, openExternal, registerPushNotifications, SmsGateway,
 } from '../lib/native';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -20,6 +21,7 @@ const TABS = [
   ['leaves', 'Leave days', Palmtree],
   ['reviews', 'Reviews', MessageSquareQuote],
   ['clinics', 'Clinics', MapPinned],
+  ['sms', 'SMS phone', Smartphone],
 ];
 
 function Loading() {
@@ -76,42 +78,142 @@ function Overview({ data }) {
   return <div className="space-y-8"><div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-4">{cards.map(([label, value]) => <div key={label} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"><p className="text-xs font-bold uppercase text-slate-500">{label}</p><p className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">{value || 0}</p></div>)}</div><div><h2 className="text-xl font-bold mb-4">Latest appointment requests</h2>{data?.recentAppointments?.length ? <div className="space-y-3">{data.recentAppointments.map((item) => <div key={item.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-wrap justify-between gap-3"><div><strong>{item.patient_name}</strong><p className="text-xs text-slate-500">{item.reference} · {item.service_name}</p></div><div className="text-right text-sm"><p>{item.appointment_date} · {formatTime(item.time_slot)}</p><span className={`inline-block mt-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase ${statusClass(item.status)}`}>{STATUS_LABELS[item.status] || item.status}</span></div></div>)}</div> : <Empty>No appointments yet.</Empty>}</div></div>;
 }
 
-function NotificationBadge({ notification, autoEnabled }) {
-  if (notification) {
-    const sent = notification.status === 'sent';
-    const time = new Date(`${notification.created_at.replace(' ', 'T')}Z`).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    return <p title={notification.error || ''} className={`text-[11px] font-semibold ${sent ? 'text-green-600' : 'text-red-500'}`}>{sent ? '✓ WhatsApp sent' : '✗ WhatsApp failed'} ({notification.event}) · {time}</p>;
-  }
-  return <p className="text-[11px] text-slate-500">{autoEnabled ? 'No WhatsApp sent yet' : 'Auto-WhatsApp off · send manually'}</p>;
+const DELIVERY_LABELS = { queued: 'waiting for phone', sending: 'sending', sent: 'sent', delivered: 'delivered', failed: 'failed' };
+
+function formatStamp(value) {
+  return new Date(`${value.replace(' ', 'T')}Z`).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-function AppointmentCard({ item, autoWhatsApp, onUpdate, onResend, onCopy }) {
+function DeliveryBadge({ label, notification, offText }) {
+  if (!notification) return offText ? <p className="text-[11px] text-slate-500">{offText}</p> : null;
+  const good = notification.status === 'sent' || notification.status === 'delivered';
+  const bad = notification.status === 'failed';
+  const tone = good ? 'text-green-600' : bad ? 'text-red-500' : 'text-amber-600';
+  return <p title={notification.error || ''} className={`text-[11px] font-semibold ${tone}`}>{good ? '✓' : bad ? '✗' : '…'} {label} {DELIVERY_LABELS[notification.status] || notification.status} ({notification.event}) · {formatStamp(notification.created_at)}{bad && notification.error ? ` — ${notification.error}` : ''}</p>;
+}
+
+function statusOptionLabel(current, status) {
+  return current === 'requested' && status === 'cancelled' ? 'Reject' : STATUS_LABELS[status];
+}
+
+function AppointmentCard({ item, autoWhatsApp, smsSender, onUpdate, onResend, onCopy }) {
   const message = item.patient_message || '';
+  const hasAutoMessage = item.status !== 'no_show';
   return <article className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0"><strong className="block truncate">{item.patient_name}</strong><p className="text-xs text-slate-500">{item.reference}</p></div>
-      <select aria-label="Appointment status" value={item.status} onChange={(event) => onUpdate(item, event.target.value)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${statusClass(item.status)}`}>{STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select>
+      <select aria-label="Appointment status" value={item.status} onChange={(event) => onUpdate(item, event.target.value)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${statusClass(item.status)}`}>{STATUSES.map((status) => <option key={status} value={status}>{statusOptionLabel(item.status, status)}</option>)}</select>
     </div>
     <p className="mt-3 text-sm font-semibold">{item.appointment_date} · {formatTime(item.time_slot)}</p>
     <p className="text-xs text-slate-500">{item.service_name} · {item.branch_name}</p>
     {item.notes && <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300">{item.notes}</p>}
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><a href={`tel:+91${item.phone}`} className="inline-flex items-center gap-1 text-sm font-semibold text-teal-600"><Phone className="h-4 w-4" />+91 {item.phone}</a><NotificationBadge notification={item.last_notification} autoEnabled={autoWhatsApp} /></div>
+    <a href={`tel:+91${item.phone}`} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-teal-600"><Phone className="h-4 w-4" />+91 {item.phone}</a>
+    <div className="mt-1 space-y-0.5">
+      <DeliveryBadge label="SMS" notification={item.last_sms} offText={smsSender ? 'No automatic SMS yet' : 'Auto-SMS off · register a phone in SMS phone'} />
+      <DeliveryBadge label="WhatsApp" notification={item.last_whatsapp} offText={autoWhatsApp ? 'No automatic WhatsApp yet' : null} />
+    </div>
     {message && <div className="mt-3 grid grid-cols-2 gap-2">
       <a {...externalLinkProps(`https://wa.me/91${item.phone}?text=${encodeURIComponent(message)}`)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-3 py-2.5 text-xs font-bold text-white"><MessageCircle className="h-4 w-4" />WhatsApp</a>
       <a {...externalLinkProps(`sms:+91${item.phone}?body=${encodeURIComponent(message)}`)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold dark:border-slate-700"><MessageSquareText className="h-4 w-4" />SMS</a>
     </div>}
     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-      {autoWhatsApp && item.status !== 'no_show' && <button type="button" onClick={() => onResend(item)} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-teal-600"><Send className="h-3 w-3" />Resend automatic WhatsApp</button>}
+      {smsSender && hasAutoMessage && <button type="button" onClick={() => onResend(item, 'sms')} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-teal-600"><Send className="h-3 w-3" />Resend automatic SMS</button>}
+      {autoWhatsApp && hasAutoMessage && <button type="button" onClick={() => onResend(item, 'whatsapp')} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-teal-600"><Send className="h-3 w-3" />Resend automatic WhatsApp</button>}
       {item.status === 'completed' && item.google_review_link && <button type="button" onClick={() => onCopy(item.google_review_link)} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-teal-600"><Copy className="h-3 w-3" />Copy Google review link</button>}
     </div>
   </article>;
 }
 
-function Appointments({ appointments, autoWhatsApp, onUpdate, onResend, onCopy }) {
+function Appointments({ appointments, autoWhatsApp, smsSender, onUpdate, onResend, onCopy }) {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const filtered = appointments.filter((item) => (filter === 'all' || item.status === filter) && [item.patient_name, item.reference, item.phone].some((value) => String(value).toLowerCase().includes(search.toLowerCase())));
-  return <div><div className="mb-5 flex flex-col sm:flex-row gap-3"><input placeholder="Search patient, phone or reference" value={search} onChange={(event) => setSearch(event.target.value)} className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3" /><select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3"><option value="all">All statuses</option>{STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select></div>{filtered.length ? <div className="grid gap-3 lg:grid-cols-2">{filtered.map((item) => <AppointmentCard key={item.id} item={item} autoWhatsApp={autoWhatsApp} onUpdate={onUpdate} onResend={onResend} onCopy={onCopy} />)}</div> : <Empty>No matching appointments.</Empty>}</div>;
+  return <div><div className="mb-5 flex flex-col sm:flex-row gap-3"><input placeholder="Search patient, phone or reference" value={search} onChange={(event) => setSearch(event.target.value)} className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3" /><select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3"><option value="all">All statuses</option>{STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select></div>{filtered.length ? <div className="grid gap-3 lg:grid-cols-2">{filtered.map((item) => <AppointmentCard key={item.id} item={item} autoWhatsApp={autoWhatsApp} smsSender={smsSender} onUpdate={onUpdate} onResend={onResend} onCopy={onCopy} />)}</div> : <Empty>No matching appointments.</Empty>}</div>;
+}
+
+function timeAgo(value) {
+  if (!value) return 'never';
+  const minutes = Math.round((Date.now() - new Date(`${value.replace(' ', 'T')}Z`).getTime()) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1440) return `${Math.round(minutes / 60)} h ago`;
+  return `${Math.round(minutes / 1440)} days ago`;
+}
+
+/** Registers the phone running ABI Doctor as the clinic's automatic SMS sender. */
+function SmsPhone({ sender, onRegister, onRemove, onTest, onLimit, notify }) {
+  const [device, setDevice] = useState(null);
+  const [form, setForm] = useState({ phone: sender?.phone || '', dailyLimit: sender?.dailyLimit || 100 });
+  const [testPhone, setTestPhone] = useState('');
+  const [log, setLog] = useState([]);
+  const refreshDevice = useCallback(() => {
+    if (hasSmsGateway) SmsGateway.getStatus().then(setDevice).catch(() => setDevice(null));
+  }, []);
+  const refreshLog = useCallback(() => {
+    api('/api/admin/sms-sender/log').then((result) => setLog(result.log)).catch(() => {});
+  }, []);
+  useEffect(() => { refreshDevice(); refreshLog(); }, [refreshDevice, refreshLog, sender]);
+  useEffect(() => {
+    if (!isNativeApp) return undefined;
+    let handle;
+    App.addListener('appStateChange', ({ isActive }) => { if (isActive) refreshDevice(); }).then((h) => { handle = h; });
+    return () => handle?.remove();
+  }, [refreshDevice]);
+  const thisPhone = Boolean(device?.registered);
+
+  async function register(event) {
+    event.preventDefault();
+    const permission = await SmsGateway.requestSmsPermission();
+    if (!permission.granted) {
+      notify('', 'Allow SMS permission for ABI Doctor so it can text patients.');
+      return;
+    }
+    await onRegister({ ...form, deviceName: device?.deviceName || '', pushToken: getPushToken() });
+    refreshDevice();
+  }
+
+  return <div className="space-y-5">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      <h2 className="flex items-center gap-2 text-lg font-extrabold"><Smartphone className="h-5 w-5 text-teal-600" />Patient SMS phone</h2>
+      <p className="mt-1 text-sm text-slate-500">One Android phone running ABI Doctor sends patient SMS from its own SIM and recharge pack: on booking, confirm, reject, cancel and completed visits.</p>
+      {sender ? <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <div><dt className="text-xs font-bold uppercase text-slate-500">Sending number</dt><dd className="font-semibold">+91 {sender.phone}</dd></div>
+        <div><dt className="text-xs font-bold uppercase text-slate-500">Phone</dt><dd className="font-semibold">{sender.deviceName || 'Android phone'}{thisPhone ? ' (this phone)' : ''}</dd></div>
+        <div><dt className="text-xs font-bold uppercase text-slate-500">Last checked in</dt><dd className="font-semibold">{timeAgo(sender.lastSeenAt)}</dd></div>
+        <div><dt className="text-xs font-bold uppercase text-slate-500">Sent today</dt><dd className="font-semibold">{sender.sentToday} / {sender.dailyLimit}</dd></div>
+        <div className="col-span-2"><dt className="text-xs font-bold uppercase text-slate-500">Instant wake-up</dt><dd className="font-semibold">{sender.wakeUpEnabled ? 'On (Firebase)' : 'Off — the phone checks every 15 minutes'}</dd></div>
+      </dl> : <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">No phone is registered. Automatic SMS is off.</p>}
+    </section>
+
+    {hasSmsGateway ? <form onSubmit={register} className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      <h3 className="font-bold">{thisPhone ? 'Update this phone' : 'Use this phone to send patient SMS'}</h3>
+      {device && !device.canSendSms && <p className="mt-2 text-sm text-red-600">This device has no SIM or cannot send SMS.</p>}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="text-xs font-bold uppercase text-slate-500">SIM mobile number<input required inputMode="numeric" maxLength="14" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="10-digit number of this SIM" className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm normal-case dark:border-slate-700 dark:bg-slate-950" /></label>
+        <label className="text-xs font-bold uppercase text-slate-500">Daily SMS limit<input required type="number" min="1" max="1000" value={form.dailyLimit} onChange={(event) => setForm((current) => ({ ...current, dailyLimit: Number(event.target.value) }))} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-950" /></label>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">Most Indian packs include 100 SMS a day. Registering here replaces any other registered phone.</p>
+      <button className="mt-4 rounded-xl bg-teal-600 px-5 py-3 text-sm font-bold text-white">{thisPhone ? 'Save and re-register' : 'Register this phone'}</button>
+      {device && !device.batteryUnrestricted && <div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">Android may pause ABI Doctor in the background. Set ABI Doctor to <strong>Unrestricted / Don&apos;t optimise</strong> so SMS go out on time.<button type="button" onClick={() => SmsGateway.openBatterySettings()} className="mt-2 block font-bold underline">Open battery settings</button></div>}
+    </form> : <p className="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-500 dark:border-slate-700">To register a sending phone, open ABI Doctor (version 1.1 or later) on the clinic's Android phone and come to this tab.</p>}
+
+    {sender && <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      <h3 className="font-bold">Test and settings</h3>
+      <form onSubmit={(event) => { event.preventDefault(); onTest(testPhone).then(refreshLog); }} className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <input required inputMode="numeric" maxLength="14" value={testPhone} onChange={(event) => setTestPhone(event.target.value)} placeholder="Send a test SMS to (10-digit number)" className="flex-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-950" />
+        <button className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white dark:bg-white dark:text-slate-950">Send test SMS</button>
+      </form>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {!hasSmsGateway && <button type="button" onClick={() => onLimit(form.dailyLimit)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold dark:border-slate-700">Save daily limit ({form.dailyLimit})</button>}
+        <button type="button" onClick={async () => { await onRemove(); if (thisPhone) await SmsGateway.clear(); refreshDevice(); }} className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 dark:bg-red-950/40">Stop automatic SMS (unregister)</button>
+      </div>
+    </section>}
+
+    {log.length > 0 && <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-center justify-between"><h3 className="font-bold">Recent SMS</h3><button type="button" onClick={refreshLog} className="text-xs font-bold text-teal-600">Refresh</button></div>
+      <ul className="mt-3 divide-y divide-slate-100 text-sm dark:divide-slate-800">{log.map((entry) => <li key={entry.id} className="flex flex-wrap justify-between gap-2 py-2"><span><strong className="capitalize">{entry.event}</strong> · {entry.phone}{entry.reference ? ` · ${entry.reference}` : ''}</span><span className={entry.status === 'failed' ? 'text-red-500' : entry.status === 'sent' || entry.status === 'delivered' ? 'text-green-600' : 'text-amber-600'} title={entry.error || ''}>{DELIVERY_LABELS[entry.status]} · {formatStamp(entry.updated_at)}</span>{entry.error && <span className="w-full text-xs text-red-500">{entry.error}</span>}</li>)}</ul>
+    </section>}
+  </div>;
 }
 
 function Schedule({ data, onSave, onToggleService }) {
@@ -199,6 +301,7 @@ export default function AdminDashboard() {
         if (newRequests.length) notifyNewAppointments(newRequests.length).catch(() => {});
       }
       knownAppointmentIds.current = new Set(nextAppointments.map((item) => item.id));
+      if (hasSmsGateway) SmsGateway.processNow().catch(() => {});
       setData({ dashboard, appointments: nextAppointments, schedule, leaves: leaves.leaves, reviews: reviews.reviews });
       setAuthenticated(true);
       setConnected(true);
@@ -242,20 +345,33 @@ export default function AdminDashboard() {
   async function act(operation, success) { setError(''); setMessage(''); try { const result = await operation(); setMessage(typeof success === 'function' ? success(result) : success); await load({ silent: true }); } catch (requestError) { setError(requestError.message); } }
   async function logout() { try { await api('/api/admin/logout', { method: 'POST', body: '{}' }); setAuthenticated(false); } catch (requestError) { setError(requestError.message); } }
   async function copy(value) { setError(''); if (await copyText(value)) setMessage('Google review link copied.'); else setError('Could not copy. Long-press the link to copy it manually.'); }
-  function notificationMessage(base, notification) {
-    if (notification?.sent) return `${base} WhatsApp sent to the patient.`;
-    if (notification?.error) return `${base} Automatic WhatsApp failed (${notification.error}). Use the WhatsApp button to send manually.`;
-    return `${base} Tap WhatsApp or SMS on the appointment to inform the patient.`;
+  function notificationMessage(base, notifications = {}) {
+    const parts = [base];
+    const { sms, whatsapp } = notifications;
+    if (sms?.queued) parts.push('SMS is on its way to the patient.');
+    else if (sms?.error) parts.push(`Automatic SMS failed: ${sms.error}`);
+    if (whatsapp?.sent) parts.push('WhatsApp sent to the patient.');
+    else if (whatsapp?.error) parts.push(`Automatic WhatsApp failed: ${whatsapp.error}`);
+    if (parts.length === 1 && !sms?.duplicate && !whatsapp?.duplicate) parts.push('Tap WhatsApp or SMS on the appointment to inform the patient.');
+    return parts.filter(Boolean).join(' ');
   }
   function updateStatus(item, status) {
-    return act(() => api(`/api/admin/appointments/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status, adminNotes: item.admin_notes || '' }) }), (result) => notificationMessage('Appointment updated.', result.notification));
+    return act(() => api(`/api/admin/appointments/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status, adminNotes: item.admin_notes || '' }) }), (result) => notificationMessage('Appointment updated.', result.notifications));
   }
-  function resendWhatsApp(item) {
-    return act(() => api(`/api/admin/appointments/${item.id}/notify`, { method: 'POST', body: '{}' }), (result) => notificationMessage('', result.notification).trim());
+  function resend(item, channel) {
+    return act(() => api(`/api/admin/appointments/${item.id}/notify`, { method: 'POST', body: JSON.stringify({ channel }) }), (result) => notificationMessage('', { [channel]: result.notification }));
   }
+  async function registerSmsPhone(form) {
+    await act(async () => {
+      const result = await api('/api/admin/sms-sender', { method: 'POST', body: JSON.stringify(form) });
+      await SmsGateway.configure({ apiBase: window.location.origin, secret: result.secret });
+      return result;
+    }, 'This phone is now the clinic SMS sender. Send a test SMS to check it.');
+  }
+  function notify(success, failure) { setMessage(success); setError(failure); }
 
   if (authenticated === null) return <main className="min-h-screen bg-slate-950 text-white"><Loading /></main>;
   if (!authenticated) return <Login onLogin={() => { setAuthenticated(true); load(); }} />;
 
-  return <main className="min-h-screen bg-slate-50 pb-[env(safe-area-inset-bottom)] text-slate-900 dark:bg-slate-950 dark:text-slate-100"><header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3"><div><h1 className="text-lg font-extrabold sm:text-xl">ABI Doctor Dashboard</h1><p className={`flex items-center gap-1 text-xs ${connected ? 'text-teal-600' : 'text-red-500'}`}>{connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}{connected ? `Live${lastSynced ? ` · synced ${lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}` : 'Offline'}</p></div><div className="flex gap-2"><button onClick={() => load()} className="rounded-xl bg-slate-100 p-2.5 dark:bg-slate-900" aria-label="Refresh"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button><button onClick={logout} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-950"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Logout</span></button></div></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6"><nav className="mb-6 flex gap-2 overflow-x-auto pb-3">{TABS.map(([id, label, Icon]) => <button key={id} onClick={() => setTab(id)} className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'}`}><Icon className="h-4 w-4" />{label}</button>)}</nav>{message && <p className="mb-5 rounded-xl bg-green-100 p-3 text-sm text-green-700">{message}</p>}{error && <p className="mb-5 rounded-xl bg-red-100 p-3 text-sm text-red-700" role="alert">{error}</p>}{loading && !data.dashboard ? <Loading /> : <>{tab === 'overview' && <Overview data={data.dashboard} />}{tab === 'appointments' && <Appointments appointments={data.appointments} autoWhatsApp={Boolean(data.dashboard?.patientWhatsApp)} onUpdate={updateStatus} onResend={resendWhatsApp} onCopy={copy} />}{tab === 'schedule' && <Schedule data={data.schedule} onSave={(branchId, periods) => act(() => api(`/api/admin/schedule/${branchId}`, { method: 'PUT', body: JSON.stringify({ periods }) }), 'Working schedule saved.')} onToggleService={(id, active) => act(() => api(`/api/admin/services/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) }), 'Service availability updated.')} />}{tab === 'leaves' && <Leaves leaves={data.leaves} branches={data.schedule.branches} onCreate={(form) => act(() => api('/api/admin/leaves', { method: 'POST', body: JSON.stringify(form) }), 'Leave day added; public slots are updated.')} onDelete={(id) => act(() => api(`/api/admin/leaves/${id}`, { method: 'DELETE' }), 'Leave day removed.')} />}{tab === 'reviews' && <ReviewsAdmin reviews={data.reviews} branches={data.schedule.branches} onModerate={(id, status) => act(() => api(`/api/admin/reviews/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }), 'Review moderated.')} onDelete={(id) => act(() => api(`/api/admin/reviews/${id}`, { method: 'DELETE' }), 'Review deleted.')} />}{tab === 'clinics' && <Clinics branches={data.schedule.branches} onSaveReviewLink={(id, googleReviewUrl) => act(() => api(`/api/admin/branches/${id}`, { method: 'PATCH', body: JSON.stringify({ googleReviewUrl }) }), 'Google review link saved.')} />}</>}</div></main>;
+  return <main className="min-h-screen bg-slate-50 pb-[env(safe-area-inset-bottom)] text-slate-900 dark:bg-slate-950 dark:text-slate-100"><header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3"><div><h1 className="text-lg font-extrabold sm:text-xl">ABI Doctor Dashboard</h1><p className={`flex items-center gap-1 text-xs ${connected ? 'text-teal-600' : 'text-red-500'}`}>{connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}{connected ? `Live${lastSynced ? ` · synced ${lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}` : 'Offline'}</p></div><div className="flex gap-2"><button onClick={() => load()} className="rounded-xl bg-slate-100 p-2.5 dark:bg-slate-900" aria-label="Refresh"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button><button onClick={logout} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-950"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Logout</span></button></div></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6"><nav className="mb-6 flex gap-2 overflow-x-auto pb-3">{TABS.map(([id, label, Icon]) => <button key={id} onClick={() => setTab(id)} className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'}`}><Icon className="h-4 w-4" />{label}</button>)}</nav>{message && <p className="mb-5 rounded-xl bg-green-100 p-3 text-sm text-green-700">{message}</p>}{error && <p className="mb-5 rounded-xl bg-red-100 p-3 text-sm text-red-700" role="alert">{error}</p>}{loading && !data.dashboard ? <Loading /> : <>{tab === 'overview' && <Overview data={data.dashboard} />}{tab === 'appointments' && <Appointments appointments={data.appointments} autoWhatsApp={Boolean(data.dashboard?.patientWhatsApp)} smsSender={data.dashboard?.smsSender} onUpdate={updateStatus} onResend={resend} onCopy={copy} />}{tab === 'schedule' && <Schedule data={data.schedule} onSave={(branchId, periods) => act(() => api(`/api/admin/schedule/${branchId}`, { method: 'PUT', body: JSON.stringify({ periods }) }), 'Working schedule saved.')} onToggleService={(id, active) => act(() => api(`/api/admin/services/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) }), 'Service availability updated.')} />}{tab === 'leaves' && <Leaves leaves={data.leaves} branches={data.schedule.branches} onCreate={(form) => act(() => api('/api/admin/leaves', { method: 'POST', body: JSON.stringify(form) }), 'Leave day added; public slots are updated.')} onDelete={(id) => act(() => api(`/api/admin/leaves/${id}`, { method: 'DELETE' }), 'Leave day removed.')} />}{tab === 'reviews' && <ReviewsAdmin reviews={data.reviews} branches={data.schedule.branches} onModerate={(id, status) => act(() => api(`/api/admin/reviews/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }), 'Review moderated.')} onDelete={(id) => act(() => api(`/api/admin/reviews/${id}`, { method: 'DELETE' }), 'Review deleted.')} />}{tab === 'sms' && <SmsPhone sender={data.dashboard?.smsSender} notify={notify} onRegister={registerSmsPhone} onRemove={() => act(() => api('/api/admin/sms-sender', { method: 'DELETE' }), 'Automatic SMS stopped. No phone is registered.')} onTest={(phone) => act(() => api('/api/admin/sms-sender/test', { method: 'POST', body: JSON.stringify({ phone }) }), 'Test SMS queued. It appears in Recent SMS when the phone sends it.')} onLimit={(dailyLimit) => act(() => api('/api/admin/sms-sender', { method: 'PATCH', body: JSON.stringify({ dailyLimit }) }), 'Daily SMS limit saved.')} />}{tab === 'clinics' && <Clinics branches={data.schedule.branches} onSaveReviewLink={(id, googleReviewUrl) => act(() => api(`/api/admin/branches/${id}`, { method: 'PATCH', body: JSON.stringify({ googleReviewUrl }) }), 'Google review link saved.')} />}</>}</div></main>;
 }

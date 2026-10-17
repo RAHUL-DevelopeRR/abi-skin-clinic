@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, LoaderCircle, MessageSquareQuote, ShieldCheck, Star } from 'lucide-react';
 import { api, getPublicBootstrap } from '../lib/api';
+import GoogleReviews from './GoogleReviews';
 
 export default function Reviews() {
   const [data, setData] = useState({ reviews: [], rating: { average: null, count: 0 } });
@@ -61,6 +62,8 @@ export default function Reviews() {
             </p>
           )}
         </div>
+
+        {data.googleReviews && data.branches?.length > 0 && <GoogleReviews branches={data.branches} />}
 
         {data.reviews?.length > 0 && (
           <div className="grid md:grid-cols-3 gap-5 mb-12">

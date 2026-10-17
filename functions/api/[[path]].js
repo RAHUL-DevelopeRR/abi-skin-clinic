@@ -1,12 +1,17 @@
 import { ApiError, errorResponse, json, methodNotAllowed, readJson, requireSameOrigin } from '../_lib/http.js';
-import { clearSessionCookie, createSession, destroySession, requireAdmin, verifySecret } from '../_lib/auth.js';
+import { clearSessionCookie, createSession, destroySession, hashText, requireAdmin, verifySecret } from '../_lib/auth.js';
 import { enforceRateLimit, isUniqueConstraintError, writeAudit } from '../_lib/database.js';
 import { getAvailability, getZonedNow, timeToMinutes } from '../_lib/schedule.js';
 import { sendNewAppointmentNotification } from '../_lib/push.js';
 import {
   branchReviewLink, buildPatientMessage, eventForStatus, googleReviewLink, isWhatsAppConfigured,
-  loadAppointmentForMessage, reviewUrl, sendPatientWhatsApp,
+  loadAppointmentForMessage, reviewUrl, sendPatientWhatsApp, transitionEvent,
 } from '../_lib/patient-messages.js';
+import {
+  claimSmsJobs, countSmsToday, getSmsSender, queuePatientSms, queueSms, reportSmsJob,
+  requireSmsSender, testSmsMessage,
+} from '../_lib/sms.js';
+import { getGoogleReviews, isPlacesConfigured } from '../_lib/places.js';
 import {
   date as validateDate,
   googleReviewUrl as validateGoogleReviewUrl,
@@ -29,7 +34,7 @@ function isMutation(method) {
   return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
 }
 
-async function publicBootstrap(db) {
+async function publicBootstrap(db, env) {
   const [branchResult, serviceResult, reviewResult, ratingResult] = await db.batch([
     db.prepare(`
       SELECT id, name, address, phone, timezone, google_review_url
@@ -53,6 +58,7 @@ async function publicBootstrap(db) {
     services: serviceResult.results || [],
     reviews: reviewResult.results || [],
     rating: ratingResult.results?.[0] || { average: null, count: 0 },
+    googleReviews: isPlacesConfigured(env),
   };
 }
 
@@ -117,12 +123,16 @@ async function createAppointment(context) {
     timeSlot,
   }));
   const origin = new URL(context.request.url).origin;
+  const smsSender = await getSmsSender(DB);
   const notificationTask = Promise.all([
     sendNewAppointmentNotification(context.env)
       .catch((error) => console.error('Appointment push notification failed.', error.message)),
     loadAppointmentForMessage(DB, appointmentId)
-      .then((appointment) => sendPatientWhatsApp(context.env, appointment, 'booked', origin))
-      .catch((error) => console.error('Patient WhatsApp acknowledgement failed.', error.message)),
+      .then((appointment) => Promise.all([
+        sendPatientWhatsApp(context.env, appointment, 'booked', origin),
+        queuePatientSms(context.env, appointment, 'booked', origin),
+      ]))
+      .catch((error) => console.error('Patient acknowledgement failed.', error.message)),
   ]);
   if (typeof context.waitUntil === 'function') context.waitUntil(notificationTask);
   return json({
@@ -136,6 +146,7 @@ async function createAppointment(context) {
       status: 'requested',
     },
     whatsappAcknowledgement: isWhatsAppConfigured(context.env),
+    smsAcknowledgement: Boolean(smsSender),
     message: 'Your appointment request is stored and awaiting clinic confirmation.',
   }, 201);
 }
@@ -241,19 +252,35 @@ const APPOINTMENT_COLUMNS = `
   a.*, b.name AS branch_name, b.address AS branch_address, b.phone AS branch_phone, b.google_review_url,
   s.name AS service_name,
   (
-    SELECT json_object('event', n.event, 'status', n.status, 'error', n.error, 'created_at', n.created_at)
-    FROM patient_notifications n WHERE n.appointment_id = a.id
+    SELECT json_object('event', n.event, 'status', n.status, 'error', n.error, 'created_at', n.updated_at)
+    FROM patient_notifications n WHERE n.appointment_id = a.id AND n.channel = 'whatsapp'
     ORDER BY n.created_at DESC LIMIT 1
-  ) AS last_notification
+  ) AS last_whatsapp,
+  (
+    SELECT json_object('event', n.event, 'status', n.status, 'error', n.error, 'created_at', n.updated_at)
+    FROM patient_notifications n WHERE n.appointment_id = a.id AND n.channel = 'sms'
+    ORDER BY n.created_at DESC LIMIT 1
+  ) AS last_sms
 `;
 
+/** The message that matches the current status; a cancelled request that was never confirmed is a rejection. */
+function currentEvent(appointment, lastEvents = []) {
+  if (appointment.status === 'cancelled' && lastEvents.includes('rejected')) return 'rejected';
+  return eventForStatus(appointment.status);
+}
+
 function withPatientMessage(appointment, origin) {
+  const lastWhatsapp = appointment.last_whatsapp ? JSON.parse(appointment.last_whatsapp) : null;
+  const lastSms = appointment.last_sms ? JSON.parse(appointment.last_sms) : null;
+  const event = currentEvent(appointment, [lastWhatsapp?.event, lastSms?.event]);
   return {
     ...appointment,
-    last_notification: appointment.last_notification ? JSON.parse(appointment.last_notification) : null,
+    last_whatsapp: lastWhatsapp,
+    last_sms: lastSms,
+    message_event: event,
     review_url: reviewUrl(origin, appointment.review_token),
     google_review_link: branchReviewLink(appointment),
-    patient_message: buildPatientMessage(eventForStatus(appointment.status), appointment, origin),
+    patient_message: buildPatientMessage(event, appointment, origin),
   };
 }
 
@@ -321,12 +348,16 @@ async function updateAppointment(context, appointmentId) {
   }
   await writeAudit(context.env.DB, 'appointment.status_updated', 'appointment', appointmentId, { status });
   const origin = new URL(context.request.url).origin;
-  let notification = { sent: false, skipped: true };
-  if (status !== existing.status) {
+  const notifications = { whatsapp: { sent: false, skipped: true }, sms: { queued: false, skipped: true } };
+  const event = transitionEvent(existing.status, status);
+  if (event) {
     const appointment = await loadAppointmentForMessage(context.env.DB, appointmentId);
-    notification = await sendPatientWhatsApp(context.env, appointment, eventForStatus(status), origin);
+    [notifications.whatsapp, notifications.sms] = await Promise.all([
+      sendPatientWhatsApp(context.env, appointment, event, origin),
+      queuePatientSms(context.env, appointment, event, origin),
+    ]);
   }
-  return { appointment: await getAppointment(context.env.DB, appointmentId, origin), notification };
+  return { appointment: await getAppointment(context.env.DB, appointmentId, origin), event, notifications };
 }
 
 async function getAppointment(db, appointmentId, origin) {
@@ -341,17 +372,93 @@ async function getAppointment(db, appointmentId, origin) {
 }
 
 async function resendPatientMessage(context, appointmentId) {
-  const appointment = await loadAppointmentForMessage(context.env.DB, appointmentId);
+  const { DB } = context.env;
+  const body = await readJson(context.request);
+  const channel = oneOf(body.channel, ['sms', 'whatsapp'], 'Channel');
+  const appointment = await loadAppointmentForMessage(DB, appointmentId);
   if (!appointment) throw new ApiError(404, 'APPOINTMENT_NOT_FOUND', 'Appointment was not found.');
-  if (!isWhatsAppConfigured(context.env)) {
-    throw new ApiError(503, 'WHATSAPP_NOT_CONFIGURED', 'Automatic WhatsApp is not configured. Use the WhatsApp button to send manually.');
-  }
+  const lastEvent = await DB.prepare(`
+    SELECT event FROM patient_notifications WHERE appointment_id = ? ORDER BY created_at DESC LIMIT 1
+  `).bind(appointmentId).first();
+  const event = currentEvent(appointment, [lastEvent?.event]);
   const origin = new URL(context.request.url).origin;
-  const notification = await sendPatientWhatsApp(context.env, appointment, eventForStatus(appointment.status), origin);
-  if (notification.skipped) {
-    throw new ApiError(400, 'NO_MESSAGE_FOR_STATUS', 'There is no automatic WhatsApp message for this appointment status.');
+  let notification;
+  if (channel === 'whatsapp') {
+    if (!isWhatsAppConfigured(context.env)) {
+      throw new ApiError(503, 'WHATSAPP_NOT_CONFIGURED', 'Automatic WhatsApp is not configured. Use the WhatsApp button to send manually.');
+    }
+    notification = await sendPatientWhatsApp(context.env, appointment, event, origin, fetch, { force: true });
+  } else {
+    if (!await getSmsSender(DB)) {
+      throw new ApiError(503, 'SMS_SENDER_NOT_REGISTERED', 'No phone is registered to send SMS. Register one in the SMS phone tab.');
+    }
+    notification = await queuePatientSms(context.env, appointment, event, origin, { force: true });
   }
-  return { appointment: await getAppointment(context.env.DB, appointmentId, origin), notification };
+  if (notification.skipped) {
+    throw new ApiError(400, 'NO_MESSAGE_FOR_STATUS', 'There is no automatic message for this appointment status.');
+  }
+  return { appointment: await getAppointment(DB, appointmentId, origin), notification };
+}
+
+async function smsSenderSummary(db) {
+  const sender = await getSmsSender(db);
+  if (!sender) return null;
+  return {
+    phone: sender.phone,
+    deviceName: sender.device_name,
+    dailyLimit: sender.daily_limit,
+    registeredAt: sender.registered_at,
+    lastSeenAt: sender.last_seen_at,
+    wakeUpEnabled: Boolean(sender.push_token),
+    sentToday: await countSmsToday(db),
+  };
+}
+
+/** Registers the phone running ABI Doctor as the clinic SMS sender, replacing any earlier one. */
+async function registerSmsSender(context) {
+  const { DB } = context.env;
+  const body = await readJson(context.request, 8_192);
+  const phone = validatePhone(body.phone);
+  const deviceName = text(body.deviceName, 'Device name', { max: 80, optional: true });
+  const pushToken = body.pushToken ? text(body.pushToken, 'Push token', { min: 20, max: 4096 }) : null;
+  const dailyLimit = integer(body.dailyLimit ?? 100, 'Daily SMS limit', { min: 1, max: 1000 });
+  const secretBytes = new Uint8Array(32);
+  crypto.getRandomValues(secretBytes);
+  const secret = Array.from(secretBytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  await DB.batch([
+    DB.prepare('DELETE FROM sms_sender'),
+    DB.prepare(`
+      INSERT INTO sms_sender (id, phone, device_name, push_token, secret_hash, daily_limit)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(crypto.randomUUID(), phone, deviceName, pushToken, await hashText(secret), dailyLimit),
+  ]);
+  await writeAudit(DB, 'sms_sender.registered', 'sms_sender', null, { deviceName });
+  return { secret, sender: await smsSenderSummary(DB) };
+}
+
+async function routeDevice(context, path) {
+  const method = context.request.method;
+  const { DB } = context.env;
+  const sender = await requireSmsSender(DB, context.request);
+  if (path === 'device/sms/pending') {
+    if (method !== 'GET') return methodNotAllowed(['GET']);
+    return json({ jobs: await claimSmsJobs(DB) });
+  }
+  const jobMatch = path.match(/^device\/sms\/([a-zA-Z0-9-]+)$/);
+  if (jobMatch) {
+    if (method !== 'POST') return methodNotAllowed(['POST']);
+    const body = await readJson(context.request, 2_048);
+    await reportSmsJob(DB, jobMatch[1], body.status, body.error);
+    return json({ updated: true });
+  }
+  if (path === 'device/push-token') {
+    if (method !== 'POST') return methodNotAllowed(['POST']);
+    const body = await readJson(context.request, 8_192);
+    const token = text(body.token, 'Push token', { min: 20, max: 4096 });
+    await DB.prepare('UPDATE sms_sender SET push_token = ? WHERE id = ?').bind(token, sender.id).run();
+    return json({ updated: true });
+  }
+  return null;
 }
 
 async function getSchedule(db) {
@@ -617,7 +724,7 @@ async function exportAppointments(db, request) {
 async function routePublic(context, path) {
   const method = context.request.method;
   if (path === 'public/bootstrap' && method === 'GET') {
-    return json(await publicBootstrap(context.env.DB), 200, { 'Cache-Control': 'public, max-age=60' });
+    return json(await publicBootstrap(context.env.DB, context.env), 200, { 'Cache-Control': 'public, max-age=60' });
   }
   if (path === 'public/availability' && method === 'GET') {
     const url = new URL(context.request.url);
@@ -632,6 +739,10 @@ async function routePublic(context, path) {
   }
   if (path === 'public/appointments/status' && method === 'GET') {
     return checkAppointmentStatus(context);
+  }
+  if (path === 'public/google-reviews' && method === 'GET') {
+    const branchId = validateId(new URL(context.request.url).searchParams.get('branch'), 'Branch');
+    return json(await getGoogleReviews(context.env, context.request, branchId));
   }
   if (path === 'public/reviews') {
     return method === 'POST' ? submitReview(context) : methodNotAllowed(['POST']);
@@ -681,7 +792,11 @@ async function routeAdmin(context, path) {
     });
   }
   if (path === 'admin/dashboard' && method === 'GET') {
-    return json({ ...await dashboard(DB), patientWhatsApp: isWhatsAppConfigured(context.env) });
+    return json({
+      ...await dashboard(DB),
+      patientWhatsApp: isWhatsAppConfigured(context.env),
+      smsSender: await smsSenderSummary(DB),
+    });
   }
   if (path === 'admin/appointments' && method === 'GET') return json({ appointments: await listAppointments(DB, context.request) });
   if (path === 'admin/appointments/export' && method === 'GET') return exportAppointments(DB, context.request);
@@ -695,6 +810,46 @@ async function routeAdmin(context, path) {
   if (notifyMatch) {
     if (method !== 'POST') return methodNotAllowed(['POST']);
     return json(await resendPatientMessage(context, notifyMatch[1]));
+  }
+
+  if (path === 'admin/sms-sender') {
+    if (method === 'GET') return json({ sender: await smsSenderSummary(DB) });
+    if (method === 'POST') return json(await registerSmsSender(context), 201);
+    if (method === 'PATCH') {
+      const body = await readJson(context.request);
+      const dailyLimit = integer(body.dailyLimit, 'Daily SMS limit', { min: 1, max: 1000 });
+      await DB.prepare('UPDATE sms_sender SET daily_limit = ?').bind(dailyLimit).run();
+      return json({ sender: await smsSenderSummary(DB) });
+    }
+    if (method === 'DELETE') {
+      await DB.prepare('DELETE FROM sms_sender').run();
+      await DB.prepare(`
+        UPDATE patient_notifications SET status = 'failed', error = 'SMS phone was unregistered.', updated_at = CURRENT_TIMESTAMP
+        WHERE channel = 'sms' AND status IN ('queued', 'sending')
+      `).run();
+      await writeAudit(DB, 'sms_sender.removed', 'sms_sender');
+      return json({ sender: null });
+    }
+    return methodNotAllowed(['GET', 'POST', 'PATCH', 'DELETE']);
+  }
+  if (path === 'admin/sms-sender/test') {
+    if (method !== 'POST') return methodNotAllowed(['POST']);
+    const body = await readJson(context.request);
+    const phone = validatePhone(body.phone);
+    if (!await getSmsSender(DB)) {
+      throw new ApiError(400, 'SMS_SENDER_NOT_REGISTERED', 'Register this phone as the SMS sender first.');
+    }
+    const result = await queueSms(context.env, { event: 'test', phone, message: testSmsMessage(), force: true });
+    if (result.error) throw new ApiError(429, 'SMS_DAILY_LIMIT', result.error);
+    return json({ queued: true });
+  }
+  if (path === 'admin/sms-sender/log' && method === 'GET') {
+    const log = await DB.prepare(`
+      SELECT n.id, n.event, n.status, n.phone, n.error, n.created_at, n.updated_at, a.reference
+      FROM patient_notifications n LEFT JOIN appointments a ON a.id = n.appointment_id
+      WHERE n.channel = 'sms' ORDER BY n.created_at DESC LIMIT 30
+    `).all();
+    return json({ log: log.results || [] });
   }
 
   const branchMatch = path.match(/^admin\/branches\/([a-zA-Z0-9_-]+)$/);
@@ -830,6 +985,7 @@ export async function onRequest(context) {
     let response = null;
     if (path.startsWith('public/')) response = await routePublic(context, path);
     if (!response && path.startsWith('admin/')) response = await routeAdmin(context, path);
+    if (!response && path.startsWith('device/')) response = await routeDevice(context, path);
     if (!response) throw new ApiError(404, 'NOT_FOUND', 'API route not found.');
 
     context.waitUntil(

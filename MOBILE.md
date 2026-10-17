@@ -12,7 +12,8 @@ D1 database and secure server-side session as the web dashboard.
 - Clinic calling, Google Maps navigation and review listing access
 - 30-second foreground monitoring, refresh on app resume and network status
 - Firebase background notifications with no patient information in the alert
-- One-tap WhatsApp/SMS messages to patients and automatic WhatsApp status
+- Automatic patient SMS sent from the registered clinic phone's SIM (SMS phone tab)
+- One-tap WhatsApp/SMS messages to patients and optional automatic WhatsApp
   (see [NOTIFICATIONS.md](NOTIFICATIONS.md))
 - Editable Google review link per clinic
 - Offline screen with automatic retry instead of a browser error page
@@ -62,3 +63,12 @@ these repository secrets are configured:
 
 The release AAB is written to
 `android/app/build/outputs/bundle/release/app-release.aab`.
+
+## SMS phone (version 1.1+)
+
+ABI Doctor includes a native SMS sender (`android/app/src/main/java/in/abiskinandhaircare/doctor/sms`).
+The registered clinic phone receives a silent Firebase wake-up, fetches queued
+messages over HTTPS and sends them with Android's `SmsManager`, falling back to a
+15-minute WorkManager check. It requires the `SEND_SMS` permission, which Google
+Play only grants to default SMS apps, so this build is distributed as an APK.
+See [NOTIFICATIONS.md](NOTIFICATIONS.md) for setup.

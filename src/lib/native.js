@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -6,6 +6,16 @@ import { Network } from '@capacitor/network';
 import { PushNotifications } from '@capacitor/push-notifications';
 
 export const isNativeApp = Capacitor.isNativePlatform();
+
+/** Native SMS sender built into ABI Doctor (android/app/src/main/java/.../sms). */
+export const SmsGateway = registerPlugin('SmsGateway');
+export const hasSmsGateway = isNativeApp && Capacitor.isPluginAvailable('SmsGateway');
+
+let latestPushToken = null;
+/** The Firebase token from the last push registration, used to wake the SMS phone. */
+export function getPushToken() {
+  return latestPushToken;
+}
 
 export async function openExternal(url) {
   if (isNativeApp) return Browser.open({ url });
@@ -75,7 +85,10 @@ export async function registerPushNotifications(onToken, onOpen) {
     : await PushNotifications.requestPermissions();
   if (permission.receive !== 'granted') return () => {};
   const handles = [
-    await PushNotifications.addListener('registration', ({ value }) => onToken(value)),
+    await PushNotifications.addListener('registration', ({ value }) => {
+      latestPushToken = value;
+      onToken(value);
+    }),
     await PushNotifications.addListener('pushNotificationActionPerformed', () => onOpen()),
   ];
   await PushNotifications.register();

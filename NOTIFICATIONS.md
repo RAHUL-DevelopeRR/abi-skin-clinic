@@ -1,93 +1,115 @@
-# Patient WhatsApp & SMS notifications
+# Patient SMS, WhatsApp and Google reviews
 
-Patients are told about their appointment in two ways.
+Patients hear about their appointment in three ways, in this order of preference.
 
-## 1. One-tap manual messages (works today, free)
+## 1. Automatic SMS from the clinic phone (free, uses the recharge pack)
 
-Every appointment card in the doctor app has **WhatsApp** and **SMS** buttons.
-They open WhatsApp or the phone's SMS app with the patient's number and a
-ready-written message for the current status:
+ABI Doctor (version 1.1 or later) can send patient SMS itself, from the SIM of
+one registered Android phone. No SMS gateway, DLT registration or per-message
+fee is needed: the messages count against the phone's normal SMS pack.
 
-| Status | Message the patient receives |
+| What happens | SMS the patient gets |
 | --- | --- |
-| Requested | Request received, reference number, tracking link |
-| Confirmed | Confirmation with date, time, address and clinic phone |
-| Cancelled | Cancellation notice with clinic phone and booking link |
-| Completed | Thank-you message with the clinic's Google review link |
-| No-show | "We missed you" with clinic phone and booking link |
+| Patient books on the website | Request received: name, reference, treatment, date, time, clinic |
+| Doctor sets Requested → Confirmed | CONFIRMED with the same details and the clinic number |
+| Doctor sets Requested → Cancelled (shown as **Reject**) | Sorry, the slot cannot be taken; call or rebook |
+| Doctor sets Confirmed → Cancelled | Visit cancelled; call or rebook |
+| Doctor sets → Completed | Thank you + short Google review link (`abiskinandhaircare.in/r/karur`) |
 
-The doctor only has to press Send. Messages go from the clinic's own WhatsApp or SIM.
+- Every message fits in one 160-character SMS. Long names use the first name and
+  very long treatments are left out.
+- Each message goes out once per appointment. Changing a status back and forth
+  does not text the patient again; use **Resend automatic SMS** for that.
+- Each appointment shows the SMS status: waiting for phone, sending, sent,
+  delivered or failed (with the reason, such as "no mobile signal").
+- A daily limit (default 100, matching most Indian packs) stops the phone from
+  running past its pack. Messages over the limit are marked failed so they can be
+  sent manually.
 
-## 2. Automatic WhatsApp (WhatsApp Cloud API)
+### How it works
 
-When configured, the server sends a WhatsApp message automatically:
+1. The server stores the message and sends the registered phone a silent
+   Firebase wake-up that contains no patient details.
+2. ABI Doctor on that phone fetches the message over HTTPS using a secret it
+   received at registration, sends it from the SIM and reports sent/delivered.
+3. If a wake-up is missed, the phone checks every 15 minutes and whenever ABI
+   Doctor is opened. A message is never sent twice: the phone remembers what it
+   has sent, and the server re-offers a message only if the phone went silent.
 
-- immediately after a patient books (acknowledgement), and
-- whenever the doctor changes the status to Confirmed, Cancelled or Completed.
+### Set up the clinic phone
 
-Each attempt is logged in `patient_notifications`. The doctor app shows
-"✓ WhatsApp sent" or "✗ WhatsApp failed" on the appointment, and a
-**Resend automatic WhatsApp** action. If sending fails, use the manual buttons.
+1. Install ABI Doctor 1.1+ on the Android phone whose SIM should send the SMS.
+   It must stay switched on, charged and online (Wi-Fi or mobile data).
+2. Sign in, open the **SMS phone** tab, enter that SIM's 10-digit number and tap
+   **Register this phone**. Allow the SMS permission when Android asks.
+3. Tap **Open battery settings** and set ABI Doctor to *Unrestricted* / *Don't
+   optimise*, otherwise Android may delay messages when the screen is off.
+4. Send a test SMS to your own number from the same tab.
 
-### One-time setup
+Only one phone sends at a time. Registering another phone replaces the first;
+**Stop automatic SMS** unregisters it.
 
-1. Create a Meta Business account and a WhatsApp Business app at
-   <https://developers.facebook.com/apps>. Add a phone number that is **not**
-   already used on the regular WhatsApp app, and complete business verification.
-2. In WhatsApp Manager → Message templates, create these four templates,
-   category **Utility**, language **English** (`en`). Keep the names and the
-   order of the `{{n}}` placeholders exactly as shown.
+> Google Play does not allow SMS-sending apps that are not the phone's default
+> SMS app, so ABI Doctor with this feature is installed directly from the APK.
 
-   **`appointment_received`**
-   > Hello {{1}}, we have received your appointment request at {{2}} for {{3}} on {{4}} at {{5}}. Reference: {{6}}. The clinic will confirm it shortly.
+## 2. One-tap manual messages
 
-   **`appointment_confirmed`**
-   > Hello {{1}}, your appointment at {{2}} on {{3}} at {{4}} is confirmed. Reference: {{5}}. To reschedule, call {{6}}.
+Every appointment card also has **WhatsApp** and **SMS** buttons that open the
+phone's apps with a ready-written message for the current status. Use them when
+automatic sending is off or a message failed.
 
-   **`appointment_cancelled`**
-   > Hello {{1}}, your appointment {{2}} on {{3}} at {{4}} has been cancelled. Please call {{5}} to book a new time.
+## 3. Automatic WhatsApp (optional, paid per message by Meta)
 
-   **`appointment_review`**
-   > Thank you for visiting {{2}}, {{1}}. Please share your experience on Google: {{3}}
+When the `WHATSAPP_ACCESS_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID` secrets are set,
+the server also sends approved WhatsApp templates on the same events. Rejections
+use the cancellation template. The four templates are defined in
+`WHATSAPP_TEMPLATES` in `functions/_lib/patient-messages.js` (Utility category,
+English). Meta rejects templates that start or end with a variable; a test checks this.
 
-3. Create a System User with a **permanent** access token that has the
-   `whatsapp_business_messaging` permission.
-4. Add the Cloudflare Pages secrets (production environment):
+Setup: create a Meta Business account and WhatsApp Business app, add a number
+not used on the regular WhatsApp app, create the four templates, create a
+System User token with `whatsapp_business_messaging`, then:
 
-   ```sh
-   npx wrangler pages secret put WHATSAPP_ACCESS_TOKEN --project-name=abi-skin-clinic
-   npx wrangler pages secret put WHATSAPP_PHONE_NUMBER_ID --project-name=abi-skin-clinic
-   ```
-
-   Optional: `WHATSAPP_TEMPLATE_LANGUAGE` (default `en`) and
-   `WHATSAPP_GRAPH_VERSION` (default `v23.0`).
-5. Redeploy. Until both secrets exist, automatic sending is skipped and the
-   app shows "Auto-WhatsApp off · send manually".
-
-Meta charges per delivered utility message (check current Indian pricing in
-WhatsApp Manager). Patients consent to WhatsApp contact on the booking form.
-
-### Why not automatic SMS?
-
-Bulk SMS in India requires DLT registration (entity, sender ID and every
-template approved with TRAI) before any gateway such as MSG91 or Twilio will
-deliver. WhatsApp needs only Meta's approval and is what patients read. If SMS
-is still wanted, register on a DLT portal first; a sender can then be added
-next to `sendPatientWhatsApp` in `functions/_lib/patient-messages.js`.
+```sh
+npx wrangler pages secret put WHATSAPP_ACCESS_TOKEN --project-name=abi-skin-clinic
+npx wrangler pages secret put WHATSAPP_PHONE_NUMBER_ID --project-name=abi-skin-clinic
+```
 
 ## Google reviews
 
-Google does not let a business post reviews for its patients. Copying
-patient reviews onto Google would break Google's fake-review policy and can get
-the listing penalised. What the system does instead:
+No Google API lets a business post reviews for patients. Instead:
 
-- After a patient submits a verified review on the website, they see
-  **Review us on Google**. Their review text is copied so they can paste it.
-  This is shown for every rating, because asking only happy patients is also
-  against Google policy.
-- The completed-appointment WhatsApp/SMS message links straight to the clinic's Google reviews, and the doctor app's Reviews tab has "Review us on Google" buttons.
-- Patients who leave a review on the website are redirected to Google afterwards, with their text copied.
-- Each clinic's Google link is set in the doctor app → **Clinics**. By default
-  it opens the clinic's Google Maps listing. For a link that opens the review
-  box directly, open Google Business Profile → **Ask for reviews** and paste
-  that `g.page/r/…/review` link.
+- Completed patients get the clinic's Google review link by SMS/WhatsApp.
+- Website reviewers are redirected to Google afterwards, with their text copied.
+- The doctor app's Reviews tab has **Review us on Google** buttons, and each
+  clinic's link can be changed in **Clinics**.
+
+### Live Google rating and reviews on the website (Places API)
+
+The Reviews section can show each clinic's live Google rating and up to five
+Google-selected reviews. Visitors tap **Show Google reviews** to load them.
+
+- Cost: these requests are billed as Place Details *Enterprise + Atmosphere*:
+  1,000 free a month, then about $25 per 1,000. Google's terms forbid storing
+  reviews, so every load is a request.
+- The server allows at most 32 Google requests a day (about 990 a month) and 6
+  per visitor per hour, so normal use stays free. When the daily budget is used
+  up, visitors are pointed to Google Maps until the next day.
+  `GOOGLE_PLACES_DAILY_LIMIT` changes the daily budget.
+- Each clinic's Google place ID is looked up once (an ID-only search, which is
+  free) and stored, as Google allows.
+
+Setup:
+
+1. In Google Cloud Console create a project, link a billing account and enable
+   **Places API (New)**.
+2. Create an API key and restrict it to **Places API (New)**.
+3. Optional safety net: in *APIs & Services → Places API (New) → Quotas*, cap
+   requests per day (for example at 32).
+4. Save the key as a secret:
+
+   ```sh
+   npx wrangler pages secret put GOOGLE_PLACES_API_KEY --project-name=abi-skin-clinic
+   ```
+
+5. Redeploy. Until the key exists, the Google reviews block stays hidden.
