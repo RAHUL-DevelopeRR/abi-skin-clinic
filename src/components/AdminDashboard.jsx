@@ -127,7 +127,28 @@ function AppointmentCard({ item, autoWhatsApp, smsSender, onUpdate, onResend, on
 function Appointments({ appointments, autoWhatsApp, smsSender, onUpdate, onResend, onCopy }) {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const filtered = appointments.filter((item) => (filter === 'all' || item.status === filter) && [item.patient_name, item.reference, item.phone].some((value) => String(value).toLowerCase().includes(search.toLowerCase())));
+  const [older, setOlder] = useState([]);
+  const query = search.trim();
+  // The dashboard holds only the latest 200 appointments, so searches and status filters also
+  // ask the server; older visits can then still be found and updated.
+  useEffect(() => {
+    if (!query && filter === 'all') return undefined;
+    const params = new URLSearchParams();
+    if (query) params.set('search', query);
+    if (filter !== 'all') params.set('status', filter);
+    let active = true;
+    const timer = window.setTimeout(() => {
+      api(`/api/admin/appointments?${params}`).then((result) => { if (active) setOlder(result.appointments); }).catch(() => {});
+    }, 300);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [query, filter, appointments]);
+  const pool = useMemo(() => {
+    if (!query && filter === 'all') return appointments;
+    const byId = new Map(older.map((item) => [item.id, item]));
+    appointments.forEach((item) => byId.set(item.id, item));
+    return [...byId.values()].sort((left, right) => `${right.appointment_date} ${right.time_slot}`.localeCompare(`${left.appointment_date} ${left.time_slot}`));
+  }, [appointments, older, query, filter]);
+  const filtered = pool.filter((item) => (filter === 'all' || item.status === filter) && [item.patient_name, item.reference, item.phone].some((value) => String(value).toLowerCase().includes(search.toLowerCase())));
   return <div><div className="mb-5 flex flex-col sm:flex-row gap-3"><input placeholder="Search patient, phone or reference" value={search} onChange={(event) => setSearch(event.target.value)} className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3" /><select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3"><option value="all">All statuses</option>{STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select></div>{filtered.length ? <div className="grid gap-3 lg:grid-cols-2">{filtered.map((item) => <AppointmentCard key={item.id} item={item} autoWhatsApp={autoWhatsApp} smsSender={smsSender} onUpdate={onUpdate} onResend={onResend} onCopy={onCopy} />)}</div> : <Empty>No matching appointments.</Empty>}</div>;
 }
 
@@ -146,6 +167,7 @@ function SmsPhone({ sender, onRegister, onRemove, onTest, onLimit, notify }) {
   const [form, setForm] = useState({ phone: sender?.phone || '', dailyLimit: sender?.dailyLimit || 100 });
   const [testPhone, setTestPhone] = useState('');
   const [log, setLog] = useState([]);
+  const [permissionAsked, setPermissionAsked] = useState(false);
   const refreshDevice = useCallback(() => {
     if (hasSmsGateway) SmsGateway.getStatus().then(setDevice).catch(() => setDevice(null));
   }, []);
@@ -160,11 +182,15 @@ function SmsPhone({ sender, onRegister, onRemove, onTest, onLimit, notify }) {
     return () => handle?.remove();
   }, [refreshDevice]);
   const thisPhone = Boolean(device?.registered);
+  // After "Don't allow" twice Android stops asking, so the only way back is app settings.
+  const showPermissionHelp = Boolean(device && !device.permission && (permissionAsked || thisPhone));
 
   async function register(event) {
     event.preventDefault();
     const permission = await SmsGateway.requestSmsPermission();
     if (!permission.granted) {
+      setPermissionAsked(true);
+      refreshDevice();
       notify('', 'Allow SMS permission for ABI Doctor so it can text patients.');
       return;
     }
@@ -189,23 +215,26 @@ function SmsPhone({ sender, onRegister, onRemove, onTest, onLimit, notify }) {
       <h3 className="font-bold">{thisPhone ? 'Update this phone' : 'Use this phone to send patient SMS'}</h3>
       {device && !device.canSendSms && <p className="mt-2 text-sm text-red-600">This device has no SIM or cannot send SMS.</p>}
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-xs font-bold uppercase text-slate-500">SIM mobile number<input required inputMode="numeric" maxLength="14" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="10-digit number of this SIM" className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm normal-case dark:border-slate-700 dark:bg-slate-950" /></label>
+        <label className="text-xs font-bold uppercase text-slate-500">SIM mobile number<input required inputMode="tel" maxLength="16" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="10-digit number of this SIM" className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm normal-case dark:border-slate-700 dark:bg-slate-950" /></label>
         <label className="text-xs font-bold uppercase text-slate-500">Daily SMS limit<input required type="number" min="1" max="1000" value={form.dailyLimit} onChange={(event) => setForm((current) => ({ ...current, dailyLimit: Number(event.target.value) }))} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-950" /></label>
       </div>
       <p className="mt-2 text-xs text-slate-500">Most Indian packs include 100 SMS a day. Registering here replaces any other registered phone.</p>
       <button className="mt-4 rounded-xl bg-teal-600 px-5 py-3 text-sm font-bold text-white">{thisPhone ? 'Save and re-register' : 'Register this phone'}</button>
+      {showPermissionHelp && <div className="mt-4 rounded-xl bg-red-50 p-3 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-200">SMS permission is off, so this phone cannot text patients. In app settings open <strong>Permissions → SMS</strong> and choose <strong>Allow</strong>.<button type="button" onClick={() => SmsGateway.openAppSettings().catch(() => {})} className="mt-2 block font-bold underline">Open app settings</button></div>}
       {device && !device.batteryUnrestricted && <div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">Android may pause ABI Doctor in the background. Set ABI Doctor to <strong>Unrestricted / Don&apos;t optimise</strong> so SMS go out on time.<button type="button" onClick={() => SmsGateway.openBatterySettings()} className="mt-2 block font-bold underline">Open battery settings</button></div>}
     </form> : <p className="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-500 dark:border-slate-700">To register a sending phone, open ABI Doctor (version 1.1 or later) on the clinic's Android phone and come to this tab.</p>}
 
     {sender && <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
       <h3 className="font-bold">Test and settings</h3>
       <form onSubmit={(event) => { event.preventDefault(); onTest(testPhone).then(refreshLog); }} className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <input required inputMode="numeric" maxLength="14" value={testPhone} onChange={(event) => setTestPhone(event.target.value)} placeholder="Send a test SMS to (10-digit number)" className="flex-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-950" />
+        <input required inputMode="tel" maxLength="16" value={testPhone} onChange={(event) => setTestPhone(event.target.value)} placeholder="Send a test SMS to (10-digit number)" className="flex-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-950" />
         <button className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white dark:bg-white dark:text-slate-950">Send test SMS</button>
       </form>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {!hasSmsGateway && <button type="button" onClick={() => onLimit(form.dailyLimit)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold dark:border-slate-700">Save daily limit ({form.dailyLimit})</button>}
-        <button type="button" onClick={async () => { await onRemove(); if (thisPhone) await SmsGateway.clear(); refreshDevice(); }} className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 dark:bg-red-950/40">Stop automatic SMS (unregister)</button>
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <label className="text-xs font-bold uppercase text-slate-500">Daily SMS limit<input type="number" min="1" max="1000" value={form.dailyLimit} onChange={(event) => setForm((current) => ({ ...current, dailyLimit: Number(event.target.value) }))} className="mt-2 block w-28 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm dark:border-slate-700 dark:bg-slate-950" /></label>
+        <button type="button" onClick={() => onLimit(form.dailyLimit)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold dark:border-slate-700">Save daily limit</button>
+        {/* Clear this phone only once the server has unregistered it, or queued SMS would wait forever. */}
+        <button type="button" onClick={async () => { if (await onRemove() && thisPhone) await SmsGateway.clear(); refreshDevice(); }} className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 dark:bg-red-950/40">Stop automatic SMS (unregister)</button>
       </div>
     </section>}
 
@@ -220,9 +249,13 @@ function Schedule({ data, onSave, onToggleService }) {
   const [branchId, setBranchId] = useState(data.branches?.[0]?.id || '');
   const source = useMemo(() => data.hours.filter((hour) => hour.branch_id === branchId), [data.hours, branchId]);
   const [days, setDays] = useState([]);
+  // Reset the editor only when the saved schedule itself changes (another branch, or a save),
+  // not on every 30-second refresh, which used to wipe unsaved edits.
+  const sourceKey = JSON.stringify(source);
   useEffect(() => {
-    setDays(DAYS.map((name, dayOfWeek) => ({ name, dayOfWeek, periods: source.filter((hour) => hour.day_of_week === dayOfWeek).map((hour) => ({ startTime: hour.start_time, endTime: hour.end_time, slotMinutes: hour.slot_minutes })) })));
-  }, [source]);
+    const saved = JSON.parse(sourceKey);
+    setDays(DAYS.map((name, dayOfWeek) => ({ name, dayOfWeek, periods: saved.filter((hour) => hour.day_of_week === dayOfWeek).map((hour) => ({ startTime: hour.start_time, endTime: hour.end_time, slotMinutes: hour.slot_minutes })) })));
+  }, [sourceKey]);
   function updatePeriod(dayIndex, periodIndex, key, value) {
     setDays((current) => current.map((day, index) => index !== dayIndex ? day : { ...day, periods: day.periods.map((period, pIndex) => pIndex !== periodIndex ? period : { ...period, [key]: key === 'slotMinutes' ? Number(value) : value }) }));
   }
@@ -290,13 +323,13 @@ export default function AdminDashboard() {
   const [lastSynced, setLastSynced] = useState(null);
   const knownAppointmentIds = useRef(null);
 
-  const load = useCallback(async ({ silent = false } = {}) => {
+  const load = useCallback(async ({ silent = false, notify = true } = {}) => {
     if (!silent) setLoading(true);
     setError('');
     try {
       const [dashboard, appointments, schedule, leaves, reviews] = await Promise.all([api('/api/admin/dashboard'), api('/api/admin/appointments'), api('/api/admin/schedule'), api('/api/admin/leaves'), api('/api/admin/reviews')]);
       const nextAppointments = appointments.appointments;
-      if (knownAppointmentIds.current) {
+      if (notify && knownAppointmentIds.current) {
         const newRequests = nextAppointments.filter((item) => item.status === 'requested' && !knownAppointmentIds.current.has(item.id));
         if (newRequests.length) notifyNewAppointments(newRequests.length).catch(() => {});
       }
@@ -323,8 +356,10 @@ export default function AdminDashboard() {
     if (!authenticated) return undefined;
     let stopMonitoring = () => {};
     let stopPushNotifications = () => {};
+    // Opening the app (or tapping its Firebase alert) shows the list itself; a second local
+    // "New appointment request" notification would only duplicate the alert just tapped.
     monitorNativeApp({
-      onResume: () => load({ silent: true }),
+      onResume: () => load({ silent: true, notify: false }),
       onNetworkChange: setConnected,
     }).then((stop) => { stopMonitoring = stop; }).catch(() => {});
     if (isNativeApp) {
@@ -333,7 +368,7 @@ export default function AdminDashboard() {
         if (!config.pushNotifications) return undefined;
         return registerPushNotifications(
           (token) => api('/api/admin/device-tokens', { method: 'POST', body: JSON.stringify({ token, platform: 'android' }) }),
-          () => load({ silent: true }),
+          () => load({ silent: true, notify: false }),
         );
       }).then((stop) => { if (stop) stopPushNotifications = stop; }).catch(() => {});
     }
@@ -342,7 +377,7 @@ export default function AdminDashboard() {
     }, 30_000);
     return () => { window.clearInterval(timer); stopMonitoring(); stopPushNotifications(); };
   }, [authenticated, load]);
-  async function act(operation, success) { setError(''); setMessage(''); try { const result = await operation(); setMessage(typeof success === 'function' ? success(result) : success); await load({ silent: true }); } catch (requestError) { setError(requestError.message); } }
+  async function act(operation, success) { setError(''); setMessage(''); try { const result = await operation(); setMessage(typeof success === 'function' ? success(result) : success); await load({ silent: true }); return true; } catch (requestError) { setError(requestError.message); return false; } }
   async function logout() { try { await api('/api/admin/logout', { method: 'POST', body: '{}' }); setAuthenticated(false); } catch (requestError) { setError(requestError.message); } }
   async function copy(value) { setError(''); if (await copyText(value)) setMessage('Google review link copied.'); else setError('Could not copy. Long-press the link to copy it manually.'); }
   function notificationMessage(base, notifications = {}) {

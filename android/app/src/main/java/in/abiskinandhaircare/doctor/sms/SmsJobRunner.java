@@ -30,7 +30,8 @@ public final class SmsJobRunner {
         Context app = context.getApplicationContext();
         SmsGatewayStore store = new SmsGatewayStore(app);
         if (!store.isConfigured()) return 0;
-        SmsGatewayApi api = new SmsGatewayApi(store.getApiBase(), store.getSecret());
+        String secret = store.getSecret();
+        SmsGatewayApi api = new SmsGatewayApi(store.getApiBase(), secret);
         try {
             flushReports(store, api);
             JSONArray jobs = api.getPendingJobs().optJSONArray("jobs");
@@ -42,6 +43,9 @@ public final class SmsJobRunner {
             }
             return handed;
         } catch (SmsGatewayApi.UnauthorizedException error) {
+            // Re-registering saves a new secret while an old request may still be in flight;
+            // its 401 must not erase the new registration.
+            if (!secret.equals(store.getSecret())) return 0;
             Log.w(TAG, "Sender registration was removed on the server; stopping.");
             store.clear();
             SmsGateway.cancelPolling(app);
@@ -107,8 +111,11 @@ public final class SmsJobRunner {
             .setData(Uri.parse("abi-sms://" + action + "/" + jobId + "/" + part))
             .putExtra(SmsResultReceiver.EXTRA_JOB_ID, jobId)
             .putExtra(SmsResultReceiver.EXTRA_LAST_PART, last);
+        // "Sent" fires once. "Delivered" also fires for interim network reports ("still trying"),
+        // so it must not be one-shot or the final delivered report would be lost.
+        int flags = SmsResultReceiver.ACTION_SENT.equals(action) ? PendingIntent.FLAG_ONE_SHOT : 0;
         // Mutable so the telephony stack can attach the delivery-report PDU.
-        int flags = PendingIntent.FLAG_ONE_SHOT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_MUTABLE : 0);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) flags |= PendingIntent.FLAG_MUTABLE;
         return PendingIntent.getBroadcast(context, 0, intent, flags);
     }
 

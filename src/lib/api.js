@@ -51,10 +51,16 @@ export function getLocalDateString(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+/** Today's date (plus offsetDays) at the clinic in India, which is what bookings are checked against. */
+export function getClinicDateString(offsetDays = 0) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const date = new Date(`${today}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+}
+
 export function getMaximumBookingDate(days = 90) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return getLocalDateString(date);
+  return getClinicDateString(days);
 }
 
 export function formatTime(value) {

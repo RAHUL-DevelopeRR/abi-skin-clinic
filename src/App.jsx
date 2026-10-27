@@ -18,6 +18,13 @@ function App() {
   const [showLookup, setShowLookup] = useState(() => window.location.hash === '#track');
   const isAdminRoute = window.location.pathname.startsWith('/admin');
 
+  // The SMS "track" link (/#track) can open in a tab already on the site, which changes only the hash.
+  useEffect(() => {
+    const openLookupFromHash = () => { if (window.location.hash === '#track') setShowLookup(true); };
+    window.addEventListener('hashchange', openLookupFromHash);
+    return () => window.removeEventListener('hashchange', openLookupFromHash);
+  }, []);
+
   // Apply theme class to document element
   useEffect(() => {
     if (darkTheme) {

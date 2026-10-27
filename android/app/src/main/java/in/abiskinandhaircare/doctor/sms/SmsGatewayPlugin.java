@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
@@ -15,10 +16,38 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import com.google.firebase.messaging.FirebaseMessaging;
 
 /** JavaScript bridge used by the doctor dashboard's "SMS phone" tab. */
 @CapacitorPlugin(name = "SmsGateway", permissions = { @Permission(alias = "sms", strings = { Manifest.permission.SEND_SMS }) })
 public class SmsGatewayPlugin extends Plugin {
+
+    @Override
+    public void load() {
+        // Repairs a registration saved without a token (or with an old one) each time the app starts.
+        if (new SmsGatewayStore(getContext()).isConfigured()) syncPushToken(getContext());
+    }
+
+    /**
+     * Sends this phone's Firebase token to the server so SMS jobs wake it instantly. Silent data
+     * messages need no notification permission, so this does not wait for the doctor-alert setup.
+     */
+    private static void syncPushToken(Context context) {
+        Context app = context.getApplicationContext();
+        try {
+            FirebaseMessaging.getInstance().getToken().addOnSuccessListener((token) -> new Thread(() -> {
+                SmsGatewayStore store = new SmsGatewayStore(app);
+                if (!store.isConfigured()) return;
+                try {
+                    new SmsGatewayApi(store.getApiBase(), store.getSecret()).updatePushToken(token);
+                } catch (Exception ignored) {
+                    // The 15-minute poll keeps SMS flowing until the next app start retries this.
+                }
+            }, "abi-sms-token").start());
+        } catch (IllegalStateException firebaseMissing) {
+            // Built without google-services.json: no instant wake-up, polling still works.
+        }
+    }
 
     @PluginMethod
     public void getStatus(PluginCall call) {
@@ -66,6 +95,7 @@ public class SmsGatewayPlugin extends Plugin {
         new SmsGatewayStore(getContext()).configure(apiBase.replaceAll("/+$", ""), secret);
         SmsGateway.schedulePolling(getContext());
         SmsGateway.processInBackground(getContext());
+        syncPushToken(getContext());
         call.resolve();
     }
 
@@ -87,6 +117,15 @@ public class SmsGatewayPlugin extends Plugin {
     @PluginMethod
     public void openBatterySettings(PluginCall call) {
         Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(intent);
+        call.resolve();
+    }
+
+    /** Opens ABI Doctor's app settings: the only way back once SMS permission was denied twice. */
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", getContext().getPackageName(), null))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         getContext().startActivity(intent);
         call.resolve();
     }

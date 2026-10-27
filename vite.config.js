@@ -4,6 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: './',
+  // Absolute asset paths: with './', /admin/ (trailing slash) loaded /admin/assets/*.js,
+  // which the SPA fallback answers with HTML, leaving a blank page.
+  base: '/',
   plugins: [react(), tailwindcss()],
 })

@@ -25,14 +25,16 @@ export default function Reviews() {
     setError('');
     setLoading(true);
     // Copy while the tap still counts as a user gesture so the text can be pasted on Google.
-    navigator.clipboard?.writeText(form.comment).catch(() => {});
+    const copying = navigator.clipboard?.writeText(form.comment).then(() => true, () => false) ?? Promise.resolve(false);
     try {
       const result = await api('/api/public/reviews', {
         method: 'POST',
         body: JSON.stringify({ ...form, token }),
       });
-      setSubmitted(result);
-      if (result.googleReviewUrl) {
+      const textCopied = await copying;
+      setSubmitted({ ...result, textCopied, comment: form.comment });
+      // In-app browsers often block the clipboard; then the patient stays here to copy the text first.
+      if (result.googleReviewUrl && textCopied) {
         window.setTimeout(() => window.location.assign(result.googleReviewUrl), 3000);
       }
     } catch (requestError) {
@@ -88,8 +90,14 @@ export default function Reviews() {
                 <p className="mt-2 text-sm text-slate-500">It will appear here after moderation.</p>
                 {submitted.googleReviewUrl && (
                   <div className="mt-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-5">
-                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Taking you to Google reviews{submitted.branchName ? ` for ${submitted.branchName}` : ''}…</p>
-                    <p className="mt-1 text-xs text-slate-500">Your review text is copied. Tap “Write a review” on Google and paste it.</p>
+                    {submitted.textCopied ? <>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Taking you to Google reviews{submitted.branchName ? ` for ${submitted.branchName}` : ''}…</p>
+                      <p className="mt-1 text-xs text-slate-500">Your review text is copied. Tap “Write a review” on Google and paste it.</p>
+                    </> : <>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Please also post it on Google{submitted.branchName ? ` for ${submitted.branchName}` : ''}</p>
+                      <p className="mt-1 text-xs text-slate-500">Copy your review below, then tap the button and choose “Write a review”.</p>
+                      <p className="mt-3 select-all rounded-xl bg-slate-50 p-3 text-left text-sm text-slate-700 dark:bg-slate-900 dark:text-slate-200">{submitted.comment}</p>
+                    </>}
                     <a href={submitted.googleReviewUrl} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-900 dark:bg-white px-5 py-3 text-sm font-bold text-white dark:text-slate-950"><Star className="w-4 h-4 fill-amber-400 text-amber-400" />Review us on Google</a>
                   </div>
                 )}

@@ -34,7 +34,7 @@ export function getZonedNow(timeZone = 'Asia/Kolkata', now = new Date()) {
 }
 
 export function generateSlots(periods, occupied, options = {}) {
-  const occupiedSet = new Set(occupied);
+  const occupiedMinutes = occupied.map(timeToMinutes);
   const slots = [];
   const sameDay = options.date && options.today && options.date === options.today;
   const earliest = sameDay
@@ -46,8 +46,10 @@ export function generateSlots(periods, occupied, options = {}) {
     const end = timeToMinutes(period.end_time);
     const interval = Number(period.slot_minutes);
     for (let cursor = start; cursor + interval <= end; cursor += interval) {
-      const value = minutesToTime(cursor);
-      if (cursor >= earliest && !occupiedSet.has(value)) slots.push(value);
+      // A booking made on an older grid (other slot length or start time) blocks every slot
+      // it overlaps, not only an identical time string.
+      const overlaps = occupiedMinutes.some((booked) => Math.abs(cursor - booked) < interval);
+      if (cursor >= earliest && !overlaps) slots.push(minutesToTime(cursor));
     }
   }
   return slots;

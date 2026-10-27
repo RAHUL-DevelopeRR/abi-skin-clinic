@@ -221,7 +221,7 @@ export default function Facilities() {
 
               {/* Navigation Arrows */}
               <button
-                className="absolute left-4 sm:left-8 p-3.5 rounded-full bg-white/5 hover:bg-white/15 text-white border border-white/5 transition-colors cursor-pointer hidden sm:block"
+                className="absolute left-4 sm:left-8 p-3.5 rounded-full bg-white/5 hover:bg-white/15 text-white border border-white/5 transition-colors cursor-pointer z-10"
                 onClick={(e) => {
                   e.stopPropagation();
                   handlePrev();
@@ -232,7 +232,7 @@ export default function Facilities() {
               </button>
 
               <button
-                className="absolute right-4 sm:right-8 p-3.5 rounded-full bg-white/5 hover:bg-white/15 text-white border border-white/5 transition-colors cursor-pointer hidden sm:block"
+                className="absolute right-4 sm:right-8 p-3.5 rounded-full bg-white/5 hover:bg-white/15 text-white border border-white/5 transition-colors cursor-pointer z-10"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleNext();

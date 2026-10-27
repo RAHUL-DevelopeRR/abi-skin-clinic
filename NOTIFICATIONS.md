@@ -18,8 +18,10 @@ fee is needed: the messages count against the phone's normal SMS pack.
 
 - Every message fits in one 160-character SMS. Long names use the first name and
   very long treatments are left out.
-- Each message goes out once per appointment. Changing a status back and forth
-  does not text the patient again; use **Resend automatic SMS** for that.
+- A patient is not sent the same message twice in a row. Confirmed → Cancelled →
+  Confirmed texts the confirmation again, because the patient's last SMS said
+  cancelled; Confirmed → Requested → Confirmed does not. **Resend automatic SMS**
+  always sends.
 - Each appointment shows the SMS status: waiting for phone, sending, sent,
   delivered or failed (with the reason, such as "no mobile signal").
 - A daily limit (default 100, matching most Indian packs) stops the phone from

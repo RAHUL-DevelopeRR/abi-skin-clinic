@@ -284,7 +284,7 @@ function withPatientMessage(appointment, origin) {
   };
 }
 
-async function listAppointments(db, request) {
+async function listAppointments(db, request, { limit = 200 } = {}) {
   const url = new URL(request.url);
   const conditions = [];
   const params = [];
@@ -317,8 +317,8 @@ async function listAppointments(db, request) {
     JOIN services s ON s.id = a.service_id
     ${where}
     ORDER BY a.appointment_date DESC, a.time_slot DESC
-    LIMIT 200
-  `).bind(...params).all();
+    ${limit ? 'LIMIT ?' : ''}
+  `).bind(...params, ...(limit ? [limit] : [])).all();
   const origin = new URL(request.url).origin;
   return (result.results || []).map((appointment) => withPatientMessage(appointment, origin));
 }
@@ -491,6 +491,9 @@ function validateSchedulePeriods(rawPeriods) {
       throw new ApiError(400, 'VALIDATION_ERROR', 'Working period end time must be after its start time.');
     }
     const periods = byDay.get(dayOfWeek) || [];
+    if (periods.length === 4) {
+      throw new ApiError(400, 'VALIDATION_ERROR', 'A day can have at most 4 working periods.');
+    }
     periods.push({ dayOfWeek, startTime, endTime, slotMinutes });
     byDay.set(dayOfWeek, periods);
   }
@@ -675,16 +678,22 @@ async function createService(context) {
     throw new ApiError(409, 'SERVICE_EXISTS', 'A service with this ID already exists.');
   }
 
-  await context.env.DB.prepare(`
-    INSERT INTO services (id, name, sort_order, active) VALUES (?, ?, ?, 1)
-  `).bind(serviceId, serviceName, sortOrder).run();
+  try {
+    await context.env.DB.prepare(`
+      INSERT INTO services (id, name, sort_order, active) VALUES (?, ?, ?, 1)
+    `).bind(serviceId, serviceName, sortOrder).run();
+  } catch (error) {
+    if (isUniqueConstraintError(error)) throw new ApiError(409, 'SERVICE_EXISTS', 'A service with this name already exists.');
+    throw error;
+  }
 
   await writeAudit(context.env.DB, 'service.created', 'service', serviceId, { name: serviceName, sortOrder });
   return json({ id: serviceId, name: serviceName, sort_order: sortOrder, active: 1 }, 201);
 }
 
 async function exportAppointments(db, request) {
-  const appointments = await listAppointments(db, request);
+  // The export is the full record, not the dashboard's latest-200 view.
+  const appointments = await listAppointments(db, request, { limit: null });
   const escapeCsv = (val) => {
     if (val === null || val === undefined) return '""';
     const str = String(val).replace(/"/g, '""');
@@ -942,9 +951,15 @@ async function routeAdmin(context, path) {
     }
     updates.push('updated_at = CURRENT_TIMESTAMP');
     params.push(serviceMatch[1]);
-    const result = await DB.prepare(`
-      UPDATE services SET ${updates.join(', ')} WHERE id = ?
-    `).bind(...params).run();
+    let result;
+    try {
+      result = await DB.prepare(`
+        UPDATE services SET ${updates.join(', ')} WHERE id = ?
+      `).bind(...params).run();
+    } catch (error) {
+      if (isUniqueConstraintError(error)) throw new ApiError(409, 'SERVICE_EXISTS', 'A service with this name already exists.');
+      throw error;
+    }
     if (!result.meta.changes) throw new ApiError(404, 'SERVICE_NOT_FOUND', 'Service was not found.');
     await writeAudit(DB, 'service.updated', 'service', serviceMatch[1], body);
     return json({ updated: true });

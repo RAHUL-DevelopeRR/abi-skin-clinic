@@ -39,14 +39,19 @@ export function transitionEvent(previousStatus, nextStatus) {
   return null;
 }
 
-/** True when this message already went out (or is on its way) for the appointment. */
+/**
+ * True when the patient's latest message on this channel (sent or on its way) is already this
+ * one. Comparing with the latest message, not any earlier one, means confirmed -> cancelled ->
+ * confirmed texts the patient again instead of leaving "cancelled" as the last word.
+ */
 export async function alreadyNotified(db, appointmentId, event, channel) {
   const row = await db.prepare(`
-    SELECT 1 FROM patient_notifications
-    WHERE appointment_id = ? AND event = ? AND channel = ? AND status != 'failed'
+    SELECT event FROM patient_notifications
+    WHERE appointment_id = ? AND channel = ? AND status != 'failed'
+    ORDER BY created_at DESC, rowid DESC
     LIMIT 1
-  `).bind(appointmentId, event, channel).first();
-  return Boolean(row);
+  `).bind(appointmentId, channel).first();
+  return row?.event === event;
 }
 
 export function eventForStatus(status) {

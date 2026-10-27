@@ -16,8 +16,17 @@ function shortDate(value) {
   return `${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;
 }
 
+// GSM 03.38 basic characters. Any other character (a name typed in Tamil, an emoji) makes the
+// network send the SMS as Unicode, which fits only 70 characters and splits into several SMS.
+const GSM_7BIT = /^[@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&'()*+,\-./0-9:;<=>?¡A-ZÄÖÑÜ§¿a-zäöñüà]*$/;
+
+export function isGsm7(text) {
+  return GSM_7BIT.test(String(text));
+}
+
 function firstName(name) {
-  return String(name || '').trim().split(/\s+/)[0].slice(0, 20);
+  const first = String(name || '').trim().split(/\s+/)[0].slice(0, 20);
+  return first && isGsm7(first) ? first : 'there';
 }
 
 function shortBranch(name) {
@@ -25,7 +34,7 @@ function shortBranch(name) {
 }
 
 function localPhone(phone) {
-  return String(phone || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
+  return String(phone || '').replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, '');
 }
 
 /**
@@ -66,7 +75,7 @@ export function buildSmsMessage(event, appointment, origin) {
     ],
   }[event];
   if (!variants) return null;
-  return variants.find((message) => message.length <= SMS_LIMIT) || variants[variants.length - 1];
+  return variants.find((message) => message.length <= SMS_LIMIT && isGsm7(message)) || variants[variants.length - 1];
 }
 
 export function testSmsMessage() {

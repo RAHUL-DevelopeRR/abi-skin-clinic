@@ -26,8 +26,10 @@ export function id(value, field = 'ID') {
 
 export function date(value, field = 'Date') {
   const normalized = text(value, field, { min: 10, max: 10 });
-  if (!DATE_PATTERN.test(normalized) || Number.isNaN(Date.parse(`${normalized}T00:00:00Z`))) {
-    throw new ApiError(400, 'VALIDATION_ERROR', `${field} must use YYYY-MM-DD format.`);
+  const parsed = DATE_PATTERN.test(normalized) ? new Date(`${normalized}T00:00:00Z`) : null;
+  // Date rolls 2026-02-30 over to 2026-03-02, so the parsed date must round-trip to the input.
+  if (!parsed || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== normalized) {
+    throw new ApiError(400, 'VALIDATION_ERROR', `${field} must be a real date in YYYY-MM-DD format.`);
   }
   return normalized;
 }
@@ -42,7 +44,8 @@ export function time(value, field = 'Time') {
 
 export function phone(value) {
   const digits = String(value ?? '').replace(/\D/g, '');
-  const local = digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits;
+  // Accept +91 98765 43210 and the trunk-prefixed 098765 43210 as well as 9876543210.
+  const local = digits.replace(/^(91|0)(?=\d{10}$)/, '');
   if (!/^[6-9]\d{9}$/.test(local)) {
     throw new ApiError(400, 'VALIDATION_ERROR', 'Enter a valid 10-digit Indian mobile number.');
   }

@@ -59,6 +59,12 @@ export default function AppointmentLookup({ isOpen, onClose }) {
             <AlertCircle className="w-3.5 h-3.5" /> Cancelled
           </span>
         );
+      case 'no_show':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+            <AlertCircle className="w-3.5 h-3.5" /> Missed Appointment
+          </span>
+        );
       case 'requested':
       default:
         return (

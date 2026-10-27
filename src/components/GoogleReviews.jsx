@@ -12,20 +12,22 @@ function Stars({ rating, className = 'w-4 h-4' }) {
  */
 export default function GoogleReviews({ branches }) {
   const [results, setResults] = useState({});
-  const [loading, setLoading] = useState('');
+  // Tracked per branch: each load is a paid Google request, so a branch already loading must
+  // stay disabled while another branch loads.
+  const [loading, setLoading] = useState({});
   const [error, setError] = useState('');
 
   async function show(branchId) {
-    if (results[branchId]) return;
+    if (results[branchId] || loading[branchId]) return;
     setError('');
-    setLoading(branchId);
+    setLoading((current) => ({ ...current, [branchId]: true }));
     try {
       const data = await api(`/api/public/google-reviews?branch=${encodeURIComponent(branchId)}`);
       setResults((current) => ({ ...current, [branchId]: data }));
     } catch (requestError) {
       setError(requestError.message);
     } finally {
-      setLoading('');
+      setLoading((current) => ({ ...current, [branchId]: false }));
     }
   }
 
@@ -34,8 +36,8 @@ export default function GoogleReviews({ branches }) {
       <h3 className="text-xl font-bold text-slate-900 dark:text-white">Reviews on Google</h3>
       <div className="mt-4 flex flex-wrap gap-2">
         {branches.map((branch) => (
-          <button key={branch.id} type="button" onClick={() => show(branch.id)} disabled={loading === branch.id} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${results[branch.id] ? 'bg-teal-600 text-white' : 'bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800'}`}>
-            {loading === branch.id && <LoaderCircle className="w-4 h-4 animate-spin" />}Show Google reviews · {branch.name}
+          <button key={branch.id} type="button" onClick={() => show(branch.id)} disabled={Boolean(loading[branch.id])} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${results[branch.id] ? 'bg-teal-600 text-white' : 'bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800'}`}>
+            {loading[branch.id] && <LoaderCircle className="w-4 h-4 animate-spin" />}Show Google reviews · {branch.name}
           </button>
         ))}
       </div>
