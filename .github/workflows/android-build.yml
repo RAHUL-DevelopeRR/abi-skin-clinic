@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: Build the signed Play Store bundle
+        description: Build the signed APK and Play Store bundle
         required: true
         type: boolean
         default: false
@@ -82,13 +82,19 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: npx cap sync android
-      - name: Build signed Play Store bundle
+      # The APK is what the clinic installs (SEND_SMS keeps the app off Google Play).
+      # Every release is signed with the same key so updates install over the old app.
+      - name: Build signed APK and Play Store bundle
         env:
           ANDROID_KEYSTORE_PATH: release.keystore
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: chmod +x android/gradlew && android/gradlew -p android bundleRelease
+        run: chmod +x android/gradlew && android/gradlew -p android assembleRelease bundleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: abi-doctor-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
           name: abi-doctor-release-aab

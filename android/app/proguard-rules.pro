@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# The SMS plugin, Firebase service, receiver and WorkManager worker are found by
+# reflection or the manifest; keep the app's own classes intact in release builds.
+-keep class in.abiskinandhaircare.doctor.** { *; }
