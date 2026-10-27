@@ -50,10 +50,15 @@ GitHub Actions also builds and retains this APK after Android-related pushes.
 Without the Firebase secret, appointment creation remains functional and push
 delivery is safely skipped.
 
-## Signed Play Store bundle
+## Signed release APK (version 1.1.1+)
 
-The manual **Android Doctor App** GitHub workflow builds the signed AAB after
-these repository secrets are configured:
+Android only installs an update over the existing app when both are signed with
+the same key. Builds up to 1.1.0 were debug builds with a different key each
+time, so moving to 1.1.1 needs one last uninstall; later updates install over it.
+
+Run the **Android Doctor App** GitHub workflow manually with **release** ticked.
+It builds the signed APK (`abi-doctor-release-apk`, the file to install) and the
+Play Store AAB (`abi-doctor-release-aab`) from these repository secrets:
 
 - `ANDROID_KEYSTORE_BASE64`
 - `ANDROID_KEYSTORE_PASSWORD`
@@ -61,8 +66,9 @@ these repository secrets are configured:
 - `ANDROID_KEY_PASSWORD`
 - `FIREBASE_GOOGLE_SERVICES_JSON_BASE64`
 
-The release AAB is written to
-`android/app/build/outputs/bundle/release/app-release.aab`.
+The keystore and its passwords are kept outside the repository and must be
+backed up. If the key is lost, no update can be installed over the app again.
+Bump `versionCode` in `android/app/build.gradle` for every release.
 
 ## SMS phone (version 1.1+)
 
