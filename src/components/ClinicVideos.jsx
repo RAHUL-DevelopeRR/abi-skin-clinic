@@ -16,7 +16,7 @@ export default function ClinicVideos() {
     <section id="videos" className="py-24 px-6 bg-white dark:bg-slate-900/40 border-t border-slate-200/50 dark:border-slate-800/40">
       <div className="max-w-6xl mx-auto">
         <div className="text-center space-y-4 mb-12">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 text-xs font-bold uppercase tracking-widest">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-400 text-xs font-bold uppercase tracking-widest">
             <CirclePlay className="w-3.5 h-3.5" />
             Videos
           </div>

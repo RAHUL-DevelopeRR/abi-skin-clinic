@@ -3,17 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
 
 // Existing assets
-import lobbyImg from '../assets/clinic_lobby.png';
-import treatmentImg from '../assets/clinic_treatment_room.png';
+import lobbyImg from '../assets/clinic_lobby.webp';
+import treatmentImg from '../assets/clinic_treatment_room.webp';
 
 // Real clinic photo assets
-import realExterior2 from '../assets/clinic_real_exterior_2.jpg';
-import realSignboard1 from '../assets/clinic_real_signboard_1.jpg';
-import realSignboard3 from '../assets/clinic_real_signboard_3.jpg';
+import realExterior2 from '../assets/clinic_real_exterior_2.webp';
+import realSignboard1 from '../assets/clinic_real_signboard_1.webp';
+import realSignboard3 from '../assets/clinic_real_signboard_3.webp';
 
 // Karur branch photo assets
-import karurBranch1 from '../assets/karur_branch_1.jpg';
-import karurBranch2 from '../assets/karur_branch_2.jpg';
+import karurBranch1 from '../assets/karur_branch_1.webp';
+import karurBranch2 from '../assets/karur_branch_2.webp';
 
 const CATEGORIES = [
   { id: 'all', label: 'All Photos' },
@@ -28,12 +28,14 @@ const IMAGES = [
     src: karurBranch2,
     category: 'karur',
     title: 'Karur Clinic Building Entrance',
+    alt: 'Entrance of Abi Skin & Hair Clinic building in Madavilagam, Karur',
     description: 'Dr. G. Srinivasan\'s main clinic building in Madavilagam, Karur (morning timing: 9:00 AM - 1:00 PM).'
   },
   {
     src: karurBranch1,
     category: 'karur',
     title: 'ABI Clinic Health Camp',
+    alt: 'ABI Clinic team at a free eye and skin health check-up camp in Karur',
     description: 'Free public eye & skin health check-up camp conducted by ABI Clinic team at Karur.'
   },
 
@@ -42,18 +44,21 @@ const IMAGES = [
     src: realExterior2,
     category: 'velayuthampalayam',
     title: 'Velayuthampalayam Gate Entrance',
+    alt: 'Gate and entrance of Abi Skin & Hair Clinic, Velayuthampalayam Bypass',
     description: 'Side frontage and entrance layout showing clinical parking space at Velayuthampalayam.'
   },
   {
     src: realSignboard1,
     category: 'velayuthampalayam',
     title: 'Velayuthampalayam Main Signboard',
+    alt: 'Abi Skin & Hair Clinic signboard in Velayuthampalayam with Dr. Srinivasan G., MBBS, DD',
     description: 'Official clinical board detailing Dr. Srinivasan G.\'s qualifications (MBBS, DD) and timings.'
   },
   {
     src: realSignboard3,
     category: 'velayuthampalayam',
     title: 'Bypass Road Directory Board',
+    alt: 'Directions board for Abi Skin & Hair Clinic on Velayuthampalayam Bypass road',
     description: 'Street-facing signboard placed on Velayuthampalayam Bypass road to guide patients.'
   },
 
@@ -113,11 +118,11 @@ export default function Facilities() {
         
         {/* Header */}
         <div className="text-center mb-12">
-          <span className="text-xs font-extrabold text-teal-600 dark:text-teal-400 uppercase tracking-widest bg-teal-500/10 border border-teal-500/20 px-3.5 py-1.5 rounded-full inline-block mb-3">
+          <span className="text-xs font-extrabold text-teal-700 dark:text-teal-400 uppercase tracking-widest bg-teal-500/10 border border-teal-500/20 px-3.5 py-1.5 rounded-full inline-block mb-3">
             Clinic Tour
           </span>
           <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white mb-4 tracking-tight">
-            Our Setups & Clinical Facilities
+            Our Clinics in Karur & Velayuthampalayam
           </h2>
           <p className="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto font-medium text-sm sm:text-base leading-relaxed">
             Take a look inside our clean, modern clinical spaces at our Karur and Velayuthampalayam branches. Click on any image to open the high-resolution lightbox viewer.
@@ -171,9 +176,10 @@ export default function Facilities() {
                 <div className="relative overflow-hidden aspect-video sm:aspect-[4/3] bg-slate-100 dark:bg-slate-900 shrink-0">
                   <img
                     src={img.src}
-                    alt={img.title}
+                    alt={img.alt || img.title}
                     className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
                     loading="lazy"
+                    decoding="async"
                   />
                   {/* Hover Overlay */}
                   <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2">
@@ -257,7 +263,7 @@ export default function Facilities() {
                 >
                   <img
                     src={filteredImages[lightboxIndex].src}
-                    alt={filteredImages[lightboxIndex].title}
+                    alt={filteredImages[lightboxIndex].alt || filteredImages[lightboxIndex].title}
                     className="max-w-full max-h-[65vh] object-contain"
                   />
                 </motion.div>

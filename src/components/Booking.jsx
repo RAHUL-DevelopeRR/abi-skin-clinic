@@ -77,7 +77,7 @@ export default function Booking() {
     <section id="book" className="py-24 px-6 bg-white dark:bg-slate-950">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
-          <span className="text-sm font-extrabold text-teal-600 uppercase tracking-widest">Live scheduling</span>
+          <span className="text-sm font-extrabold text-teal-700 uppercase tracking-widest">Live scheduling</span>
           <h2 className="mt-3 text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white">Request an Appointment</h2>
           <p className="mt-4 text-slate-500 font-medium">Slots come from the doctor-managed calendar and are protected against double booking.</p>
         </div>

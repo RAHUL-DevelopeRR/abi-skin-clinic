@@ -1,22 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="30 20 140 170" width="32" height="32" fill="none">
-  {/* Isometric 3D Cube Group */}
-  <g stroke="#ffffff" strokeWidth="4.5" strokeLinejoin="round" strokeLinecap="round">
-    {/* Top Face - Burgundy / Dark Pink */}
+  <!-- Isometric 3D Cube Group -->
+  <g stroke="#ffffff" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Top Face - Burgundy / Dark Pink -->
     <polygon points="100,30 40,65 100,100 160,65" fill="#8e1d22" />
     
-    {/* Left Face - Dark Navy Blue */}
+    <!-- Left Face - Dark Navy Blue -->
     <polygon points="40,65 100,100 100,180 40,145" fill="#0f1c3f" />
     
-    {/* Right Face - Navy Blue */}
+    <!-- Right Face - Navy Blue -->
     <polygon points="100,100 160,65 160,145 100,180" fill="#15244c" />
   </g>
 
-  {/* Isometric text on Top Face */}
-  <text transform="translate(100, 68) rotate(-30) skewX(30) scale(1, 0.86)" textAnchor="middle" dominantBaseline="middle" fill="#ffffff" fontSize="17" fontWeight="900" fontFamily="Georgia, serif" letterSpacing="0.5">SKIN</text>
+  <!-- Isometric text on Top Face -->
+  <text transform="translate(100, 68) rotate(-30) skewX(30) scale(1, 0.86)" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-size="17" font-weight="900" font-family="Georgia, serif" letter-spacing="0.5">SKIN</text>
 
-  {/* Isometric text on Left Face */}
-  <text transform="translate(70, 122) skewY(30)" textAnchor="middle" dominantBaseline="middle" fill="#ffffff" fontSize="17" fontWeight="900" fontFamily="Georgia, serif" letterSpacing="0.5">HAIR</text>
+  <!-- Isometric text on Left Face -->
+  <text transform="translate(70, 122) skewY(30)" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-size="17" font-weight="900" font-family="Georgia, serif" letter-spacing="0.5">HAIR</text>
 
-  {/* Isometric text on Right Face */}
-  <text transform="translate(130, 122) skewY(-30)" textAnchor="middle" dominantBaseline="middle" fill="#ffffff" fontSize="17" fontWeight="900" fontFamily="Georgia, serif" letterSpacing="0.5">NAIL</text>
+  <!-- Isometric text on Right Face -->
+  <text transform="translate(130, 122) skewY(-30)" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-size="17" font-weight="900" font-family="Georgia, serif" letter-spacing="0.5">NAIL</text>
 </svg>

@@ -23,7 +23,7 @@ export default function Navbar({ darkTheme, setDarkTheme, onOpenLookup }) {
           >
             <ClinicLogo className="w-10 h-12 -mt-1 group-hover:scale-105 transition-transform" />
             <div className="text-left">
-              <span className="block font-bold text-[8px] uppercase tracking-widest text-teal-600 dark:text-teal-400 -mb-1">
+              <span className="block font-bold text-[8px] uppercase tracking-widest text-teal-700 dark:text-teal-400 -mb-1">
                 Dr. Srinivasan's
               </span>
               <span className="block font-extrabold text-base tracking-tight text-slate-900 dark:text-white -mb-1">

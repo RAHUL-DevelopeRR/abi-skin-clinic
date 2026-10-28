@@ -1,28 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, HelpCircle } from 'lucide-react';
-
-const faqs = [
-  {
-    question: "Who is the chief doctor at Dr. Srinivasan's Abi Skin & Hair Clinic?",
-    answer: "The chief dermatologist and trichologist is Dr. G. Srinivasan, MBBS, D.D. (Dermatology). He is an alumnus of the prestigious Madras Medical College and has over 16+ years of clinical experience specializing in advanced clinical dermatology, trichology, hair restoration, and aesthetic lasers."
-  },
-  {
-    question: "What are the timings and schedules of the Karur and Velayuthampalayam branches?",
-    answer: "We serve patients at two branches: \n• Karur Branch: Open Monday to Saturday (9:00 AM - 1:00 PM and 4:00 PM - 8:30 PM). Located behind Easwaran Kovil, Madavilagam.\n• Velayuthampalayam Branch: Open Monday to Saturday (5:30 PM - 8:30 PM). Located near Pugali Mandapam on the Bypass."
-  },
-  {
-    question: "What treatments are available for active hair fall and thinning?",
-    answer: "We evaluate hair loss and alopecia to identify likely causes, then create an appropriate medical treatment and follow-up plan for each patient."
-  },
-  {
-    question: "Do I need a prior appointment to consult the doctor?",
-    answer: "Yes, we highly recommend scheduling a consultation using our online appointment portal or by calling/messaging us. Booking in advance secures your consultation slot and minimizes wait times at both our branches."
-  },
-  {
-    question: "Are the aesthetic laser treatments safe?",
-    answer: "Laser and IPL procedures are performed under Dr. G. Srinivasan's supervision after a suitability assessment. Benefits, risks, alternatives and aftercare are explained before treatment."
-  }
-];
+import { FAQS } from '../data/clinic';
 
 export default function FAQ() {
   const [openIndex, setOpenIndex] = useState(null);
@@ -39,7 +17,7 @@ export default function FAQ() {
 
       <div className="max-w-4xl mx-auto">
         <div className="text-center space-y-4 mb-16">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 text-xs font-bold uppercase tracking-widest">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-400 text-xs font-bold uppercase tracking-widest">
             <HelpCircle className="w-3.5 h-3.5" />
             Frequently Asked Questions
           </div>
@@ -52,13 +30,14 @@ export default function FAQ() {
         </div>
 
         <div className="space-y-4">
-          {faqs.map((faq, index) => {
+          {FAQS.map((faq, index) => {
             const isOpen = openIndex === index;
             return (
               <div 
                 key={index}
                 className="group border border-slate-200/60 dark:border-slate-800/40 rounded-2xl bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden"
               >
+                <h3>
                 <button
                   onClick={() => toggleFAQ(index)}
                   className="w-full flex items-center justify-between p-6 text-left cursor-pointer focus:outline-none"
@@ -71,8 +50,9 @@ export default function FAQ() {
                     <ChevronDown className="w-4 h-4" />
                   </div>
                 </button>
+                </h3>
                 <div 
-                  className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-h-60 border-t border-slate-100 dark:border-slate-800/50' : 'max-h-0'}`}
+                  className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-h-96 border-t border-slate-100 dark:border-slate-800/50' : 'max-h-0'}`}
                 >
                   <p className="p-6 text-xs sm:text-sm text-slate-600 dark:text-slate-350 leading-relaxed font-semibold whitespace-pre-line">
                     {faq.answer}

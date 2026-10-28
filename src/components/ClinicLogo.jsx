@@ -83,7 +83,7 @@ export default function ClinicLogo({ className = "w-10 h-12" }) {
           textAnchor="middle"
           fontSize="15"
           fontWeight="800"
-          fontFamily="'Outfit', sans-serif"
+          fontFamily="'Outfit Variable', sans-serif"
           letterSpacing="0.5"
         >
           Mind Your Skin

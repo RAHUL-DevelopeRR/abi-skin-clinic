@@ -1,0 +1,15 @@
+# Cloudflare Pages headers for static files and the page itself (Functions under /api set their own).
+
+# Vite puts a content hash in every file name under /assets, so they never change in place.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The doctor dashboard (also loaded by the ABI Doctor app) stays out of search results.
+# robots.txt does not block it on purpose: a crawler must fetch the page to see this header.
+/admin
+  X-Robots-Tag: noindex, nofollow
+/admin/*
+  X-Robots-Tag: noindex, nofollow
+
+/app-offline.html
+  X-Robots-Tag: noindex

@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', '.wrangler', 'android', 'src/components/PitchDeck.jsx']),
+  globalIgnores(['dist', 'dist-ssr', '.wrangler', 'android', 'src/components/PitchDeck.jsx']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -22,5 +22,10 @@ export default defineConfig([
       'react-hooks/immutability': 'off',
       'react-hooks/purity': 'off',
     },
+  },
+  {
+    // Build scripts run in Node.
+    files: ['scripts/**/*.js'],
+    languageOptions: { globals: globals.node },
   },
 ])

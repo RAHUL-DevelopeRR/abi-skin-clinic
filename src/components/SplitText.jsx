@@ -7,7 +7,8 @@ export default function SplitText({
   duration = 0.5,
   stagger = 0.03,
 }) {
-  const letters = Array.from(text);
+  // Letters are grouped by word so a narrow screen wraps between words, not inside one.
+  const words = text.split(/(\s+)/).filter(Boolean);
 
   const container = {
     hidden: { opacity: 0 },
@@ -42,16 +43,20 @@ export default function SplitText({
       whileInView="visible"
       viewport={{ once: true, margin: "-50px" }}
     >
-      {letters.map((letter, index) => (
-        <motion.span
-          variants={child}
-          key={index}
-          className="inline-block select-none"
-          style={{ display: 'inline-block', whiteSpace: 'pre' }}
-        >
-          {letter}
-        </motion.span>
-      ))}
+      {words.map((word, wordIndex) => (/^\s+$/.test(word) ? <span key={wordIndex} style={{ whiteSpace: 'pre-wrap' }}>{word}</span> : (
+        <span key={wordIndex} className="inline-block whitespace-nowrap">
+          {Array.from(word).map((letter, index) => (
+            <motion.span
+              variants={child}
+              key={index}
+              className="inline-block select-none"
+              style={{ display: 'inline-block', whiteSpace: 'pre' }}
+            >
+              {letter}
+            </motion.span>
+          ))}
+        </span>
+      )))}
     </motion.span>
   );
 }

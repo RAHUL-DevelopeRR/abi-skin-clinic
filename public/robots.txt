@@ -1,6 +1,7 @@
 User-agent: *
 Allow: /
 
-# Host & Sitemap
-Host: https://abiskinandhaircare.in
+# /admin (the doctor dashboard) is kept out of search results with a noindex header (see _headers),
+# not blocked here, because a blocked page can still be listed from links.
+
 Sitemap: https://abiskinandhaircare.in/sitemap.xml

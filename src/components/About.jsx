@@ -1,6 +1,6 @@
 import { Award, BookOpen, HeartHandshake, ShieldCheck } from 'lucide-react';
 import TiltedCard from './TiltedCard';
-import doctorImg from '../assets/dr_srinivasan_real.png';
+import doctorImg from '../assets/dr_srinivasan_real.webp';
 
 export default function About() {
   return (
@@ -14,9 +14,13 @@ export default function About() {
               <div className="relative group rounded-3xl overflow-hidden shadow-2xl border-4 border-white dark:border-slate-800">
                 {/* Decorative border highlight */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-teal-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none" />
-                <img 
-                  src={doctorImg} 
-                  alt="Dr. Srinivasan G." 
+                <img
+                  src={doctorImg}
+                  alt="Dr. G. Srinivasan, MBBS, DD, dermatologist at Abi Skin & Hair Clinic, Karur"
+                  width="642"
+                  height="632"
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-auto object-cover transform group-hover:scale-103 transition-transform duration-500"
                 />
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-950/80 to-transparent p-6 text-white text-left z-20">
@@ -29,9 +33,9 @@ export default function About() {
 
           {/* Details Column */}
           <div className="lg:col-span-7">
-            <span className="text-sm font-extrabold text-teal-600 dark:text-teal-400 uppercase tracking-widest block mb-3">Meet the Expert</span>
+            <span className="text-sm font-extrabold text-teal-700 dark:text-teal-400 uppercase tracking-widest block mb-3">Dedicated to Skin Health & Aesthetic Excellence</span>
             <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white mb-6 leading-tight">
-              Dedicated to Skin Health & Aesthetic Excellence
+              Meet Dr. G. Srinivasan, Dermatologist in Karur
             </h2>
             <p className="text-base text-slate-600 dark:text-slate-300 font-medium leading-relaxed mb-8">
               Dr. Srinivasan G. provides dermatology and hair consultations in Karur and Velayuthampalayam. His clinical work includes common and chronic skin conditions, hair loss, and suitable doctor-supervised laser and aesthetic procedures.
@@ -46,7 +50,7 @@ export default function About() {
                   <Award className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Clinical Experience</h4>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Clinical Experience</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Over 16 years of active, hands-on dermatology and trichology care.</p>
                 </div>
               </div>
@@ -57,7 +61,7 @@ export default function About() {
                   <BookOpen className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Qualifications</h4>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Qualifications</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">MBBS, DD (Diploma in Dermatology).</p>
                 </div>
               </div>
@@ -68,7 +72,7 @@ export default function About() {
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Clinical Focus</h4>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Clinical Focus</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Medical dermatology, hair disorders, laser and IPL procedures.</p>
                 </div>
               </div>
@@ -79,7 +83,7 @@ export default function About() {
                   <HeartHandshake className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Patient-Centric Care</h4>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Patient-Centric Care</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Individual assessment, treatment planning and follow-up care.</p>
                 </div>
               </div>

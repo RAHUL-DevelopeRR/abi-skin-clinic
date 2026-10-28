@@ -9,7 +9,8 @@ export default function Reviews() {
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(null);
   const [form, setForm] = useState({ name: '', rating: 5, comment: '', consent: false });
-  const token = useMemo(() => new URLSearchParams(window.location.search).get('review'), []);
+  // typeof window: the build also renders this section in Node (scripts/prerender.js).
+  const token = useMemo(() => (typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('review')), []);
 
   useEffect(() => {
     let active = true;
@@ -48,7 +49,7 @@ export default function Reviews() {
     <section id="reviews" className="py-24 px-6 bg-white dark:bg-slate-950">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <span className="text-sm font-extrabold text-teal-600 uppercase tracking-widest block mb-3">Verified patient feedback</span>
+          <span className="text-sm font-extrabold text-teal-700 uppercase tracking-widest block mb-3">Verified patient feedback</span>
           <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white">Patient Reviews</h2>
           {Number(data.rating?.count) > 0 ? (
             <p className="mt-4 text-slate-500 font-semibold">{data.rating.average} out of 5 from {data.rating.count} approved verified {Number(data.rating.count) === 1 ? 'review' : 'reviews'}.</p>

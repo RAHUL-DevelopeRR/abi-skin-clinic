@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Services from './components/Services';
@@ -11,13 +11,28 @@ import Reviews from './components/Reviews';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import AppointmentLookup from './components/AppointmentLookup';
-import AdminDashboard from './components/AdminDashboard';
-import treatmentImg from './assets/clinic_treatment_room.png';
+import treatmentImg from './assets/cta-treatment-room-1024.webp';
+
+// The doctor dashboard and its Capacitor plugins load only on /admin, outside the public page's bundle.
+const AdminDashboard = lazy(() => import('./components/AdminDashboard').catch(() => ({
+  // A failed download (a flaky network in the doctor app) offers a retry instead of a blank screen.
+  default: function AdminLoadFailed() {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="font-semibold">The dashboard could not be loaded.</p>
+        <button onClick={() => window.location.reload()} className="rounded-xl bg-teal-600 px-5 py-3 text-sm font-bold text-white">Retry</button>
+      </div>
+    );
+  },
+})));
+
+// The build also renders this page in Node (scripts/prerender.js), where there is no window.
+const isBrowser = typeof window !== 'undefined';
 
 function App() {
   const [darkTheme, setDarkTheme] = useState(false);
-  const [showLookup, setShowLookup] = useState(() => window.location.hash === '#track');
-  const isAdminRoute = window.location.pathname.startsWith('/admin');
+  const [showLookup, setShowLookup] = useState(() => isBrowser && window.location.hash === '#track');
+  const isAdminRoute = isBrowser && window.location.pathname.startsWith('/admin');
 
   // The SMS "track" link (/#track) can open in a tab already on the site, which changes only the hash.
   useEffect(() => {
@@ -35,7 +50,7 @@ function App() {
     }
   }, [darkTheme]);
 
-  if (isAdminRoute) return <AdminDashboard />;
+  if (isAdminRoute) return <Suspense fallback={null}><AdminDashboard /></Suspense>;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-300">
@@ -48,6 +63,7 @@ function App() {
       />
 
       {/* Main Website Sections */}
+      <main>
       <Hero onOpenLookup={() => setShowLookup(true)} />
       
       <Services />
@@ -61,17 +77,21 @@ function App() {
       {/* Full-width Call to Action Banner */}
       <section className="py-24 px-6 relative overflow-hidden text-white text-center">
         <div className="absolute inset-0 z-0">
-          <img 
-            src={treatmentImg} 
-            alt="Clinic Treatment Suite" 
+          <img
+            src={treatmentImg}
+            alt=""
+            width="1024"
+            height="1024"
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover object-center filter saturate-75"
           />
           <div className="absolute inset-0 bg-slate-950/80" />
         </div>
         <div className="max-w-3xl mx-auto relative z-10 space-y-6">
-          <h3 className="text-3xl sm:text-4xl font-extrabold text-white">
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-white">
             Doctor-led Clinical Care
-          </h3>
+          </h2>
           <p className="text-slate-300 text-sm sm:text-base font-semibold leading-relaxed max-w-xl mx-auto">
             Modern clinical facilities and personal medical attention from Dr. G. Srinivasan. Treatment suitability is decided after consultation.
           </p>
@@ -100,7 +120,8 @@ function App() {
       <Reviews />
 
       <FAQ />
-      
+      </main>
+
       <Footer
         onOpenLookup={() => setShowLookup(true)}
       />

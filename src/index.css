@@ -1,12 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
-
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-heading: 'Outfit', sans-serif;
-  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  --font-heading: 'Outfit Variable', sans-serif;
+  --font-sans: 'Plus Jakarta Sans Variable', sans-serif;
   
   /* Override Teal with Hot Pink / Magenta from the clinic ad */
   --color-teal-50: #fdf2f8;

@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import acneImage from '../assets/treatments/acne.jpg';
-import alopeciaImage from '../assets/treatments/alopecia.jpg';
-import cryotherapyImage from '../assets/treatments/cryotherapy.jpg';
-import laserImage from '../assets/treatments/laser-hair-removal.jpg';
-import nailFungusImage from '../assets/treatments/nail-fungus.jpg';
-import psoriasisImage from '../assets/treatments/psoriasis.jpg';
-import urticariaImage from '../assets/treatments/urticaria.jpg';
-import vitiligoImage from '../assets/treatments/vitiligo.jpg';
+import acneImage from '../assets/treatments/acne.webp';
+import alopeciaImage from '../assets/treatments/alopecia.webp';
+import cryotherapyImage from '../assets/treatments/cryotherapy.webp';
+import laserImage from '../assets/treatments/laser-hair-removal.webp';
+import nailFungusImage from '../assets/treatments/nail-fungus.webp';
+import psoriasisImage from '../assets/treatments/psoriasis.webp';
+import urticariaImage from '../assets/treatments/urticaria.webp';
+import vitiligoImage from '../assets/treatments/vitiligo.webp';
 
 const SERVICES = [
   {
@@ -118,7 +118,7 @@ export default function Services() {
             Doctor-led dermatology, laser & IPL care
           </span>
           <h2 className="mb-5 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-5xl dark:text-white">
-            Treatments available at ABI Clinic
+            Skin, Hair & Laser Treatments at ABI Clinic
           </h2>
           <p className="font-medium leading-relaxed text-slate-600 dark:text-slate-300">
             Every procedure starts with a clinical assessment. The doctor will confirm the diagnosis, treatment suitability and expected course before proceeding.
@@ -160,6 +160,7 @@ export default function Services() {
                     src={service.image}
                     alt={service.imageAlt}
                     loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 to-transparent px-5 pb-4 pt-10">

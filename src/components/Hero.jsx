@@ -1,17 +1,25 @@
 import { motion } from 'framer-motion';
 import { Calendar, ArrowRight, ShieldCheck } from 'lucide-react';
 import SplitText from './SplitText';
-
-const CLINIC_HERO_BG = 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&w=1200&q=80';
+import heroBg640 from '../assets/hero-karur-clinic-640.webp';
+import heroBg1024 from '../assets/hero-karur-clinic-1024.webp';
 
 export default function Hero() {
   return (
     <section id="home" className="relative min-h-[85vh] flex items-center justify-center py-24 px-6 overflow-hidden">
       {/* Full-bleed background photo with dark/light responsive overlays */}
       <div className="absolute inset-0 z-0">
-        <img 
-          src={CLINIC_HERO_BG} 
-          alt="Dermatology Clinic Consultation Room" 
+        {/* The Karur clinic building, as a faint backdrop. It is the largest paint, so it loads first and
+            is decoded with the first frame. Under the 90% tint, phones get the 640px file. */}
+        <img
+          src={heroBg1024}
+          srcSet={`${heroBg640} 640w, ${heroBg1024} 1024w`}
+          sizes="(max-width: 767px) 360px, 100vw"
+          alt=""
+          width="1024"
+          height="472"
+          fetchPriority="high"
+          decoding="sync"
           className="w-full h-full object-cover object-center filter saturate-75"
         />
         {/* Responsive tint overlay to ensure high readability */}
@@ -20,22 +28,22 @@ export default function Hero() {
       </div>
 
       <div className="max-w-4xl mx-auto text-center relative z-10 flex flex-col items-center">
-        {/* Experience Badge */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6 }}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/20 text-xs font-bold uppercase tracking-wider mb-8"
-        >
-          <ShieldCheck className="w-4 h-4" />
-          <span>Consultant-led Skin & Hair Care</span>
-        </motion.div>
-
-        {/* Headline */}
+        {/* Headline: the badge is part of the h1 so the page's main heading names the specialty and towns. */}
         <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-6 leading-[1.1] select-none">
-          <SplitText text="Flawless Skin. Healthy Hair. " className="text-slate-900 dark:text-white" />
-          <span className="bg-gradient-to-r from-teal-600 to-teal-400 bg-clip-text text-transparent block sm:inline mt-2">
-            Expert Care.
+          <motion.span
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6 }}
+            className="flex w-fit max-w-full mx-auto items-center justify-center gap-1.5 px-4 py-1.5 rounded-2xl sm:rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/20 font-sans text-xs font-bold uppercase tracking-wider leading-normal mb-8"
+          >
+            <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span>Dermatologist in Karur & Velayuthampalayam</span>
+          </motion.span>{' '}
+          <span className="block">
+            <SplitText text="Flawless Skin. Healthy Hair. " className="text-slate-900 dark:text-white" />
+            <span className="bg-gradient-to-r from-teal-600 to-teal-400 bg-clip-text text-transparent block sm:inline mt-2">
+              Expert Care.
+            </span>
           </span>
         </h1>
 
@@ -51,6 +59,9 @@ export default function Hero() {
             Dr. Srinivasan G. (MBBS, DD)
           </span>{' '}
           for diagnosis-led skin and hair care.
+          <span lang="ta" className="block mt-3 text-sm sm:text-base font-semibold text-slate-600 dark:text-slate-300">
+            கரூர் மற்றும் வேலாயுதம்பாளையத்தில் தோல் மற்றும் முடி சிறப்பு மருத்துவர்
+          </span>
         </motion.p>
 
         {/* Buttons */}
