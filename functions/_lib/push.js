@@ -1,3 +1,5 @@
+import { formatDisplayDate, formatDisplayTime } from './patient-messages.js';
+
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
@@ -81,21 +83,46 @@ export async function sendSmsWakeUp(env, token) {
   return response.ok;
 }
 
-export async function sendNewAppointmentNotification(env) {
-  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) return;
-  const devices = await env.DB.prepare(`
-    SELECT token FROM doctor_devices ORDER BY updated_at DESC LIMIT 20
-  `).all();
-  if (!devices.results?.length) return;
-  const results = await sendFirebaseMessages(env, devices.results.map(({ token }) => ({
+/** Branch, day and time of a new request. Patient details stay in the app, not in the push. */
+export function appointmentAlertText(branchName, appointmentDate, timeSlot) {
+  if (!appointmentDate || !timeSlot) return 'Open ABI Doctor to review the latest request.';
+  const when = `${formatDisplayDate(appointmentDate)} · ${formatDisplayTime(timeSlot)}`;
+  return branchName ? `${branchName} · ${when}` : when;
+}
+
+/** Firebase message for one doctor device, in the alert style that device registered. */
+export function appointmentAlertMessage(token, alertStyle, appointmentId, body) {
+  const title = 'New appointment request';
+  if (alertStyle === 'ring') {
+    // Data-only, so ABI Doctor handles it itself and rings until the doctor responds. A late
+    // ring is pointless, so it expires after 15 minutes if the phone stays offline.
+    return {
+      token,
+      data: { type: 'appointment_request', appointmentId: appointmentId || '', title, body },
+      android: { priority: 'high', ttl: '900s' },
+    };
+  }
+  return {
     token,
-    notification: {
-      title: 'New appointment request',
-      body: 'Open ABI Doctor to review the latest request.',
-    },
+    notification: { title, body },
     android: { priority: 'high', notification: { channel_id: 'appointments' } },
     data: { route: '/admin' },
-  })));
+  };
+}
+
+export async function sendNewAppointmentNotification(env, { appointmentId, branchId, appointmentDate, timeSlot } = {}) {
+  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) return;
+  const devices = await env.DB.prepare(`
+    SELECT token, alert_style FROM doctor_devices ORDER BY updated_at DESC LIMIT 20
+  `).all();
+  if (!devices.results?.length) return;
+  const branch = branchId
+    ? await env.DB.prepare('SELECT name FROM branches WHERE id = ?').bind(branchId).first()
+    : null;
+  const body = appointmentAlertText(branch?.name, appointmentDate, timeSlot);
+  const results = await sendFirebaseMessages(env, devices.results.map(({ token, alert_style: alertStyle }) => (
+    appointmentAlertMessage(token, alertStyle, appointmentId, body)
+  )));
   await Promise.all(results.map(async ({ token, response }) => {
     if (response.status === 404) {
       // The app was uninstalled or the token rotated; stop sending to it.

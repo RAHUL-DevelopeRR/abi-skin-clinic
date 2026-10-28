@@ -43,6 +43,20 @@
             android:name=".sms.SmsResultReceiver"
             android:exported="false" />
 
+        <!-- Ringing new-request alert: full-screen card over the lock screen, plus its Silence button. -->
+        <activity
+            android:name=".alerts.AppointmentAlertActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:taskAffinity="in.abiskinandhaircare.doctor.alerts"
+            android:theme="@style/Theme.AppCompat.NoActionBar"
+            android:turnScreenOn="true" />
+        <receiver
+            android:name=".alerts.AlertActionReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -60,4 +74,8 @@
     <!-- Sends patient SMS from the registered clinic phone (direct-install APK only). -->
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <!-- Ringing alerts for new appointment requests. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>

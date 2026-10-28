@@ -11,6 +11,14 @@ export const isNativeApp = Capacitor.isNativePlatform();
 export const SmsGateway = registerPlugin('SmsGateway');
 export const hasSmsGateway = isNativeApp && Capacitor.isPluginAvailable('SmsGateway');
 
+/** Ringing new-request alerts (android/.../alerts), ABI Doctor 1.1.3+. */
+export const AppointmentAlerts = registerPlugin('AppointmentAlerts');
+export const hasAppointmentAlerts = isNativeApp && Capacitor.isPluginAvailable('AppointmentAlerts');
+
+/** Video picker, compressor and uploader (android/.../video), ABI Doctor 1.1.3+. */
+export const VideoUploader = registerPlugin('VideoUploader');
+export const hasNativeVideoUploader = isNativeApp && Capacitor.isPluginAvailable('VideoUploader');
+
 let latestPushToken = null;
 /** The Firebase token from the last push registration, used to wake the SMS phone. */
 export function getPushToken() {

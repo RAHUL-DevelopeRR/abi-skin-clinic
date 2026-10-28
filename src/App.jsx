@@ -4,6 +4,7 @@ import Hero from './components/Hero';
 import Services from './components/Services';
 import About from './components/About';
 import Facilities from './components/Facilities';
+import ClinicVideos from './components/ClinicVideos';
 import BranchInfo from './components/BranchInfo';
 import Booking from './components/Booking';
 import Reviews from './components/Reviews';
@@ -54,6 +55,8 @@ function App() {
       <About />
 
       <Facilities />
+
+      <ClinicVideos />
 
       {/* Full-width Call to Action Banner */}
       <section className="py-24 px-6 relative overflow-hidden text-white text-center">

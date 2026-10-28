@@ -13,6 +13,9 @@ import {
 } from '../_lib/sms.js';
 import { getGoogleReviews, isPlacesConfigured } from '../_lib/places.js';
 import {
+  completeVideoUpload, createVideoUpload, deleteVideo, listVideos, serveVideo, updateVideo, uploadVideoPart,
+} from '../_lib/videos.js';
+import {
   date as validateDate,
   googleReviewUrl as validateGoogleReviewUrl,
   id as validateId,
@@ -125,7 +128,7 @@ async function createAppointment(context) {
   const origin = new URL(context.request.url).origin;
   const smsSender = await getSmsSender(DB);
   const notificationTask = Promise.all([
-    sendNewAppointmentNotification(context.env)
+    sendNewAppointmentNotification(context.env, { appointmentId, branchId, appointmentDate, timeSlot })
       .catch((error) => console.error('Appointment push notification failed.', error.message)),
     loadAppointmentForMessage(DB, appointmentId)
       .then((appointment) => Promise.all([
@@ -756,7 +759,23 @@ async function routePublic(context, path) {
   if (path === 'public/reviews') {
     return method === 'POST' ? submitReview(context) : methodNotAllowed(['POST']);
   }
+  if (path === 'public/videos' && method === 'GET') {
+    return json({ videos: await listVideos(context.env, { publishedOnly: true }) }, 200, { 'Cache-Control': 'public, max-age=60' });
+  }
+  const videoFileMatch = path.match(/^public\/videos\/([a-zA-Z0-9-]+)\/file$/);
+  if (videoFileMatch) {
+    if (!['GET', 'HEAD'].includes(method)) return methodNotAllowed(['GET', 'HEAD']);
+    return serveVideo(context.env, context.request, videoFileMatch[1], { publishedOnly: true });
+  }
   return null;
+}
+
+/** Video parts come from ABI Doctor's native uploader, which holds an upload token instead of the admin cookie. */
+async function routeUploads(context, path) {
+  const partMatch = path.match(/^uploads\/videos\/([a-zA-Z0-9-]+)\/parts\/(\d{1,5})$/);
+  if (!partMatch) return null;
+  if (context.request.method !== 'PUT') return methodNotAllowed(['PUT']);
+  return json(await uploadVideoPart(context.env, context.request, partMatch[1], Number(partMatch[2])));
 }
 
 async function routeAdmin(context, path) {
@@ -788,10 +807,13 @@ async function routeAdmin(context, path) {
     const body = await readJson(context.request);
     const token = text(body.token, 'Device token', { min: 20, max: 4096 });
     const platform = oneOf(body.platform, ['android', 'ios'], 'Platform');
+    // ABI Doctor 1.1.3+ rings for new requests; older apps only show Firebase's own notification.
+    const alertStyle = oneOf(body.alertStyle ?? 'notification', ['notification', 'ring'], 'Alert style');
     await DB.prepare(`
-      INSERT INTO doctor_devices (token, platform) VALUES (?, ?)
-      ON CONFLICT(token) DO UPDATE SET platform = excluded.platform, updated_at = CURRENT_TIMESTAMP
-    `).bind(token, platform).run();
+      INSERT INTO doctor_devices (token, platform, alert_style) VALUES (?, ?, ?)
+      ON CONFLICT(token) DO UPDATE SET
+        platform = excluded.platform, alert_style = excluded.alert_style, updated_at = CURRENT_TIMESTAMP
+    `).bind(token, platform, alertStyle).run();
     return json({ registered: true });
   }
   if (path === 'admin/mobile-config' && method === 'GET') {
@@ -971,6 +993,43 @@ async function routeAdmin(context, path) {
     return methodNotAllowed(['GET', 'PATCH']);
   }
 
+  if (path === 'admin/videos') {
+    if (method === 'GET') return json({ videos: await listVideos(context.env) });
+    if (method === 'POST') {
+      const upload = await createVideoUpload(context.env, await readJson(context.request));
+      await writeAudit(DB, 'video.upload_started', 'video', upload.video.id, { sizeBytes: upload.video.sizeBytes });
+      return json(upload, 201);
+    }
+    return methodNotAllowed(['GET', 'POST']);
+  }
+  const videoCompleteMatch = path.match(/^admin\/videos\/([a-zA-Z0-9-]+)\/complete$/);
+  if (videoCompleteMatch) {
+    if (method !== 'POST') return methodNotAllowed(['POST']);
+    await completeVideoUpload(context.env, videoCompleteMatch[1], await readJson(context.request, 65_536));
+    await writeAudit(DB, 'video.uploaded', 'video', videoCompleteMatch[1]);
+    return json({ videos: await listVideos(context.env) });
+  }
+  const adminVideoFileMatch = path.match(/^admin\/videos\/([a-zA-Z0-9-]+)\/file$/);
+  if (adminVideoFileMatch) {
+    if (!['GET', 'HEAD'].includes(method)) return methodNotAllowed(['GET', 'HEAD']);
+    return serveVideo(context.env, context.request, adminVideoFileMatch[1], { publishedOnly: false });
+  }
+  const videoMatch = path.match(/^admin\/videos\/([a-zA-Z0-9-]+)$/);
+  if (videoMatch) {
+    if (method === 'PATCH') {
+      const body = await readJson(context.request);
+      await updateVideo(context.env, videoMatch[1], body);
+      await writeAudit(DB, 'video.updated', 'video', videoMatch[1], body);
+      return json({ videos: await listVideos(context.env) });
+    }
+    if (method === 'DELETE') {
+      await deleteVideo(context.env, videoMatch[1]);
+      await writeAudit(DB, 'video.deleted', 'video', videoMatch[1]);
+      return json({ videos: await listVideos(context.env) });
+    }
+    return methodNotAllowed(['PATCH', 'DELETE']);
+  }
+
   return null;
 }
 
@@ -1001,6 +1060,7 @@ export async function onRequest(context) {
     if (path.startsWith('public/')) response = await routePublic(context, path);
     if (!response && path.startsWith('admin/')) response = await routeAdmin(context, path);
     if (!response && path.startsWith('device/')) response = await routeDevice(context, path);
+    if (!response && path.startsWith('uploads/')) response = await routeUploads(context, path);
     if (!response) throw new ApiError(404, 'NOT_FOUND', 'API route not found.');
 
     context.waitUntil(

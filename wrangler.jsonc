@@ -11,5 +11,11 @@
       "database_id": "a352f4a8-7d49-49ec-be00-d1c4b82a185f",
       "migrations_dir": "migrations"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "VIDEOS",
+      "bucket_name": "abi-clinic-videos"
+    }
   ]
 }

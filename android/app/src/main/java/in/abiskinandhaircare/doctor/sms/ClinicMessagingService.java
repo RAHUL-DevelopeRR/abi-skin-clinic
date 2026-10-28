@@ -3,18 +3,27 @@ package in.abiskinandhaircare.doctor.sms;
 import androidx.annotation.NonNull;
 import com.capacitorjs.plugins.pushnotifications.MessagingService;
 import com.google.firebase.messaging.RemoteMessage;
+import in.abiskinandhaircare.doctor.alerts.AppointmentAlerts;
+import java.util.Map;
 
 /**
  * Android delivers Firebase messages to a single service. This one handles the silent
- * "SMS jobs waiting" wake-up and passes every other message (doctor alerts) to Capacitor.
+ * "SMS jobs waiting" wake-up and the ringing new-request alert, and passes every other
+ * message to Capacitor.
  */
 public class ClinicMessagingService extends MessagingService {
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
-        if ("sms_jobs".equals(remoteMessage.getData().get("type"))) {
+        Map<String, String> data = remoteMessage.getData();
+        String type = data.get("type");
+        if ("sms_jobs".equals(type)) {
             // Already on a background thread with a short execution window for high-priority messages.
             SmsJobRunner.run(getApplicationContext());
+            return;
+        }
+        if ("appointment_request".equals(type)) {
+            AppointmentAlerts.onNewRequest(getApplicationContext(), data.get("title"), data.get("body"));
             return;
         }
         super.onMessageReceived(remoteMessage);
