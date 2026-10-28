@@ -13,6 +13,7 @@ import androidx.media3.effect.Presentation;
 import androidx.media3.transformer.Composition;
 import androidx.media3.transformer.DefaultEncoderFactory;
 import androidx.media3.transformer.EditedMediaItem;
+import androidx.media3.transformer.EditedMediaItemSequence;
 import androidx.media3.transformer.Effects;
 import androidx.media3.transformer.ExportException;
 import androidx.media3.transformer.ExportResult;
@@ -148,6 +149,11 @@ final class VideoCompressor {
                 public void onCompleted(Composition composition, ExportResult result) {
                     running[0] = null;
                     handler.removeCallbacks(poll);
+                    if (result.videoMimeType != null && !MimeTypes.VIDEO_H264.equals(result.videoMimeType)) {
+                        deleteQuietly(output);
+                        listener.onError("This phone could not convert the video to a format every browser plays.");
+                        return;
+                    }
                     if (output.length() > 0 && output.length() <= maxBytes) {
                         listener.onDone(output);
                         return;
@@ -177,8 +183,13 @@ final class VideoCompressor {
                 Collections.<Effect>singletonList(
                     Presentation.createForWidthAndHeight(plan.width, plan.height, Presentation.LAYOUT_SCALE_TO_FIT))));
         }
+        // HDR recordings would otherwise stay HDR as 10-bit HEVC, which many browsers cannot play;
+        // tone-map them to ordinary H.264. SDR videos are unaffected.
+        Composition composition = new Composition.Builder(new EditedMediaItemSequence.Builder(item.build()).build())
+            .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
+            .build();
         running[0] = transformer;
-        transformer.start(item.build(), output.getAbsolutePath());
+        transformer.start(composition, output.getAbsolutePath());
         handler.post(poll);
     }
 

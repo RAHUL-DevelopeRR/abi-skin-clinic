@@ -1,5 +1,5 @@
 import { api, ApiClientError } from './api';
-import { VideoUploader } from './native';
+import { isNativeApp, VideoUploader } from './native';
 
 /** Matches the server: "under 100 MB" in the units phones show (1 MB = 1,000,000 bytes). */
 export const MAX_VIDEO_BYTES = 100_000_000;
@@ -9,8 +9,19 @@ export function formatMegabytes(bytes) {
   return `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`;
 }
 
+/** Why a video picked in a browser (or ABI Doctor before 1.1.3) is refused, worded for where the doctor is. */
+export function tooLargeMessage(bytes) {
+  // Rounded up, so a file just over the limit never reads as "100.0 MB".
+  const size = `${(Math.ceil(bytes / 100_000) / 10).toFixed(1)} MB`;
+  return isNativeApp
+    ? `This video is ${size}. Update ABI Doctor to the latest version, which compresses videos over 100 MB automatically.`
+    : `This video is ${size}. Upload it from the ABI Doctor app, which compresses videos over 100 MB automatically.`;
+}
+
 export function titleFromFileName(name = '') {
-  return name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+  const title = name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+  // The photo picker names files by number ("1000178490") and cameras by date ("VID_20261028_183831").
+  return /^(?:vid|video|img|mov)?[\s\d]*$/i.test(title) ? '' : title;
 }
 
 async function startUpload({ title, description, published, contentType, sizeBytes }) {
@@ -65,9 +76,7 @@ export async function uploadVideo({ picked, file, title, description, published,
         sizeBytes: prepared.sizeBytes,
       }));
     } else {
-      if (file.size > MAX_VIDEO_BYTES) {
-        throw new Error(`This video is ${formatMegabytes(file.size)}. Upload it from the ABI Doctor app, which compresses videos over 100 MB automatically.`);
-      }
+      if (file.size > MAX_VIDEO_BYTES) throw new Error(tooLargeMessage(file.size));
       if (!BROWSER_TYPES.includes(file.type)) throw new Error('Choose an MP4, WebM or MOV video.');
       upload = await startUpload({ title, description, published, contentType: file.type, sizeBytes: file.size });
       onProgress('uploading', 0);

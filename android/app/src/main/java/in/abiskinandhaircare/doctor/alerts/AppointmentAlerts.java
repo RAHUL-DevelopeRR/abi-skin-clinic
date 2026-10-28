@@ -1,5 +1,6 @@
 package in.abiskinandhaircare.doctor.alerts;
 
+import android.app.AppOpsManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -11,13 +12,14 @@ import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
-import android.service.notification.StatusBarNotification;
+import android.os.Process;
 import androidx.core.app.NotificationCompat;
 import androidx.work.ExistingWorkPolicy;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkManager;
 import in.abiskinandhaircare.doctor.MainActivity;
 import in.abiskinandhaircare.doctor.R;
+import java.lang.reflect.Method;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -34,14 +36,17 @@ public final class AppointmentAlerts {
     static final int RING_ID = 41_001;
     static final int WAITING_ID = 41_002;
     static final long RING_MILLIS = 60_000;
-    /** If the timeout job is held back (Doze), the ring still never lasts longer than this. */
-    private static final long RING_HARD_LIMIT_MILLIS = 3 * 60_000;
     private static final String TIMEOUT_WORK = "appointment-ring-timeout";
     private static final String PREFS = "abi_appointment_alerts";
     private static final String KEY_RING_ENABLED = "ring_enabled";
+    /** A ring was started and has not been answered, silenced or turned into a reminder yet. */
+    private static final String KEY_PENDING = "ring_pending";
     private static final String KEY_TITLE = "last_title";
     private static final String KEY_BODY = "last_body";
     private static final long[] VIBRATION = { 0, 900, 500, 900, 500, 900 };
+
+    /** True while the dashboard is on screen (set by MainActivity). */
+    public static volatile boolean appInForeground;
 
     private AppointmentAlerts() {}
 
@@ -53,11 +58,20 @@ public final class AppointmentAlerts {
         prefs(context).edit().putBoolean(KEY_RING_ENABLED, enabled).apply();
     }
 
+    /** False when the doctor blocked or lowered the ringing channel in Android's settings. */
+    static boolean isRingChannelOn(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true;
+        ensureChannels(context);
+        NotificationChannel channel = notificationManager(context).getNotificationChannel(RING_CHANNEL);
+        return channel == null || channel.getImportance() >= NotificationManager.IMPORTANCE_HIGH;
+    }
+
     /** Entry point for a new-request push: rings, or posts a plain notification if ringing is off. */
     public static void onNewRequest(Context context, String title, String body) {
         String safeTitle = title == null || title.isEmpty() ? "New appointment request" : title;
         String safeBody = body == null || body.isEmpty() ? "Open ABI Doctor to review it." : body;
-        if (isRingEnabled(context)) {
+        // A blocked ringing channel would swallow the alert entirely, so fall back to a plain one.
+        if (isRingEnabled(context) && isRingChannelOn(context)) {
             ring(context, safeTitle, safeBody);
         } else {
             ensureChannels(context);
@@ -68,7 +82,7 @@ public final class AppointmentAlerts {
     static void ring(Context context, String title, String body) {
         Context app = context.getApplicationContext();
         ensureChannels(app);
-        prefs(app).edit().putString(KEY_TITLE, title).putString(KEY_BODY, body).apply();
+        prefs(app).edit().putBoolean(KEY_PENDING, true).putString(KEY_TITLE, title).putString(KEY_BODY, body).apply();
 
         PendingIntent fullScreen = PendingIntent.getActivity(app, 2,
             new Intent(app, AppointmentAlertActivity.class)
@@ -89,7 +103,8 @@ public final class AppointmentAlerts {
             .setFullScreenIntent(fullScreen, true)
             .setAutoCancel(true)
             .setOngoing(true)
-            .setTimeoutAfter(RING_HARD_LIMIT_MILLIS)
+            // The system stops the sound on time even if the reminder job below runs late (Doze).
+            .setTimeoutAfter(RING_MILLIS)
             .addAction(0, "Open", openApp(app))
             .addAction(0, "Silence", PendingIntent.getBroadcast(app, 3,
                 new Intent(app, AlertActionReceiver.class).setAction(AlertActionReceiver.ACTION_SILENCE),
@@ -111,35 +126,59 @@ public final class AppointmentAlerts {
                 .build());
     }
 
-    /** Stops the ring but leaves a quiet reminder that a request is waiting. */
+    /**
+     * Stops the ring but leaves a quiet reminder that a request is waiting. Keyed on the pending
+     * flag rather than the ringing notification, which the system may already have timed out.
+     */
     static void silence(Context context) {
         Context app = context.getApplicationContext();
-        if (!isRinging(app)) return;
-        notificationManager(app).cancel(RING_ID);
-        WorkManager.getInstance(app).cancelUniqueWork(TIMEOUT_WORK);
         SharedPreferences prefs = prefs(app);
-        notificationManager(app).notify(WAITING_ID, waiting(app, WAITING_CHANNEL,
+        if (!prefs.getBoolean(KEY_PENDING, false)) return;
+        prefs.edit().putBoolean(KEY_PENDING, false).apply();
+        NotificationManager manager = notificationManager(app);
+        manager.cancel(RING_ID);
+        WorkManager.getInstance(app).cancelUniqueWork(TIMEOUT_WORK);
+        // With the dashboard on screen, the request is already in front of the doctor.
+        if (appInForeground) return;
+        manager.notify(WAITING_ID, waiting(app, WAITING_CHANNEL,
             "Appointment request waiting", prefs.getString(KEY_BODY, "Open ABI Doctor to review it.")));
     }
 
     /** The doctor opened ABI Doctor: the request list is in front of them, so clear every alert. */
     public static void dismissAll(Context context) {
         Context app = context.getApplicationContext();
+        prefs(app).edit().putBoolean(KEY_PENDING, false).apply();
         NotificationManager manager = notificationManager(app);
         manager.cancel(RING_ID);
         manager.cancel(WAITING_ID);
         WorkManager.getInstance(app).cancelUniqueWork(TIMEOUT_WORK);
     }
 
-    static boolean isRinging(Context context) {
-        for (StatusBarNotification active : notificationManager(context).getActiveNotifications()) {
-            if (active.getId() == RING_ID) return true;
-        }
-        return false;
-    }
-
     static boolean canUseFullScreen(Context context) {
         return Build.VERSION.SDK_INT < 34 || notificationManager(context).canUseFullScreenIntent();
+    }
+
+    /** MIUI (Xiaomi, Redmi, POCO) blocks waking the screen and lock-screen cards behind its own switches. */
+    static boolean isXiaomi() {
+        return "xiaomi".equalsIgnoreCase(Build.MANUFACTURER) || "redmi".equalsIgnoreCase(Build.BRAND)
+            || "poco".equalsIgnoreCase(Build.BRAND);
+    }
+
+    /** MIUI's private permission switches, as AppOps codes. */
+    static final int MIUI_AUTOSTART = 10008;
+    static final int MIUI_SHOW_ON_LOCK_SCREEN = 10020;
+    static final int MIUI_BACKGROUND_POPUPS = 10021;
+
+    /** Whether a MIUI switch is on for ABI Doctor, or null when this phone does not say. */
+    static Boolean miuiAllowed(Context context, int op) {
+        try {
+            AppOpsManager ops = (AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE);
+            Method check = AppOpsManager.class.getMethod("checkOpNoThrow", int.class, int.class, String.class);
+            Object mode = check.invoke(ops, op, Process.myUid(), context.getPackageName());
+            return mode instanceof Integer ? (Integer) mode == AppOpsManager.MODE_ALLOWED : null;
+        } catch (ReflectiveOperationException | RuntimeException unavailable) {
+            return null;
+        }
     }
 
     static void ensureChannels(Context context) {

@@ -11,7 +11,7 @@ import {
   hasNativeVideoUploader, hasSmsGateway, isNativeApp, monitorNativeApp, notifyNewAppointments, openExternal,
   registerPushNotifications, SmsGateway, VideoUploader,
 } from '../lib/native';
-import { formatMegabytes, MAX_VIDEO_BYTES, titleFromFileName, uploadVideo } from '../lib/videos';
+import { formatMegabytes, MAX_VIDEO_BYTES, titleFromFileName, tooLargeMessage, uploadVideo } from '../lib/videos';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const STATUSES = ['requested', 'confirmed', 'completed', 'cancelled', 'no_show'];
@@ -75,10 +75,10 @@ function Login({ onLogin }) {
   );
 }
 
-function Overview({ data }) {
+function Overview({ data, ringRegistered }) {
   const stats = data?.stats || {};
   const cards = [['Today', stats.today], ['New requests', stats.requested], ['Upcoming confirmed', stats.upcomingConfirmed], ['Completed', stats.completed], ['Reviews pending', stats.pendingReviews]];
-  return <div className="space-y-8"><RequestAlerts /><div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-4">{cards.map(([label, value]) => <div key={label} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"><p className="text-xs font-bold uppercase text-slate-500">{label}</p><p className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">{value || 0}</p></div>)}</div><div><h2 className="text-xl font-bold mb-4">Latest appointment requests</h2>{data?.recentAppointments?.length ? <div className="space-y-3">{data.recentAppointments.map((item) => <div key={item.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-wrap justify-between gap-3"><div><strong>{item.patient_name}</strong><p className="text-xs text-slate-500">{item.reference} · {item.service_name}</p></div><div className="text-right text-sm"><p>{item.appointment_date} · {formatTime(item.time_slot)}</p><span className={`inline-block mt-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase ${statusClass(item.status)}`}>{STATUS_LABELS[item.status] || item.status}</span></div></div>)}</div> : <Empty>No appointments yet.</Empty>}</div></div>;
+  return <div className="space-y-8"><RequestAlerts registered={ringRegistered} /><div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-4">{cards.map(([label, value]) => <div key={label} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"><p className="text-xs font-bold uppercase text-slate-500">{label}</p><p className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">{value || 0}</p></div>)}</div><div><h2 className="text-xl font-bold mb-4">Latest appointment requests</h2>{data?.recentAppointments?.length ? <div className="space-y-3">{data.recentAppointments.map((item) => <div key={item.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-wrap justify-between gap-3"><div><strong>{item.patient_name}</strong><p className="text-xs text-slate-500">{item.reference} · {item.service_name}</p></div><div className="text-right text-sm"><p>{item.appointment_date} · {formatTime(item.time_slot)}</p><span className={`inline-block mt-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase ${statusClass(item.status)}`}>{STATUS_LABELS[item.status] || item.status}</span></div></div>)}</div> : <Empty>No appointments yet.</Empty>}</div></div>;
 }
 
 const DELIVERY_LABELS = { queued: 'waiting for phone', sending: 'sending', sent: 'sent', delivered: 'delivered', failed: 'failed' };
@@ -336,7 +336,7 @@ function ReviewsAdmin({ reviews, branches, onModerate, onDelete }) {
 }
 
 /** ABI Doctor 1.1.3+: the phone rings like a call for each new request until the doctor responds. */
-function RequestAlerts() {
+function RequestAlerts({ registered }) {
   const [status, setStatus] = useState(null);
   const [error, setError] = useState('');
   const [testQueued, setTestQueued] = useState(false);
@@ -356,7 +356,14 @@ function RequestAlerts() {
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 font-extrabold"><BellRing className="h-5 w-5 text-teal-600" />Ringing request alerts</h2><p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">{status.ringEnabled ? 'This phone rings for every new appointment request until you open ABI Doctor or tap Silence (up to 1 minute), even when it is locked.' : 'Ringing is off on this phone. New requests show a normal notification.'}</p></div><button type="button" onClick={toggle} className={`rounded-xl px-4 py-2.5 text-sm font-bold ${status.ringEnabled ? 'border border-slate-200 dark:border-slate-700' : 'bg-teal-600 text-white'}`}>{status.ringEnabled ? 'Turn ringing off' : 'Turn ringing on'}</button></div>
     <div className="mt-4 space-y-2">
       {!status.notificationsAllowed && <p className={warning}>Notifications are off for ABI Doctor, so requests cannot ring.<button type="button" onClick={() => AppointmentAlerts.openNotificationSettings()} className="font-bold underline">Turn on</button></p>}
+      {status.notificationsAllowed && registered === false && <p className={warning}>This phone is not registered for request alerts yet, so new bookings cannot reach it. Allow notifications for ABI Doctor, then close and reopen the app. Test alert only checks this phone’s sound.</p>}
+      {status.notificationsAllowed && status.ringEnabled && !status.ringChannelOn && <p className={warning}>“Ringing request alerts” is blocked or set to silent in Android settings, so requests only show a normal notification.<button type="button" onClick={() => AppointmentAlerts.openRingChannelSettings()} className="font-bold underline">Fix it</button></p>}
       {status.ringEnabled && !status.fullScreenAllowed && <p className={warning}>Allow full-screen alerts so a request shows over the lock screen.<button type="button" onClick={() => AppointmentAlerts.openFullScreenSettings()} className="font-bold underline">Allow</button></p>}
+      {status.ringEnabled && status.xiaomi && [status.miuiLockScreen, status.miuiBackgroundPopups, status.miuiAutostart].some((allowed) => allowed !== true) && <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+        <p className="font-bold">Xiaomi phones need three more switches, or a locked phone only rings with the screen dark:</p>
+        <ul className="mt-2 space-y-1">{[['Show on Lock screen', status.miuiLockScreen], ['Display pop-up windows while running in the background', status.miuiBackgroundPopups], ['Autostart', status.miuiAutostart]].map(([label, allowed]) => <li key={label} className="flex items-start gap-2">{allowed === true ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" /> : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />}{label}</li>)}</ul>
+        <div className="mt-3 flex flex-wrap gap-3"><button type="button" onClick={() => AppointmentAlerts.openXiaomiPermissions()} className="font-bold underline">Open lock-screen permissions</button><button type="button" onClick={() => AppointmentAlerts.openAppInfo()} className="font-bold underline">Open Autostart</button></div>
+      </div>}
     </div>
     <div className="mt-4 flex flex-wrap items-center gap-3"><button type="button" onClick={test} disabled={testQueued} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60 dark:bg-white dark:text-slate-950"><BellRing className="h-4 w-4" />{testQueued ? 'Ringing in 5 seconds…' : 'Test alert'}</button><p className="text-xs text-slate-500">Rings in 5 seconds. Lock the phone to see the full-screen alert.</p></div>
     {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
@@ -365,7 +372,7 @@ function RequestAlerts() {
 
 const VIDEO_STAGE_LABELS = { compressing: 'Compressing to under 100 MB', uploading: 'Uploading' };
 
-function VideoCard({ video, onPatch, onDelete }) {
+function VideoCard({ video, uploading, onPatch, onDelete }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(video.title);
   const [description, setDescription] = useState(video.description);
@@ -374,13 +381,13 @@ function VideoCard({ video, onPatch, onDelete }) {
   return <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
     {ready ? <video src={`/api/admin/videos/${video.id}/file#t=0.1`} controls playsInline preload="metadata" className="aspect-video w-full bg-black" /> : <div className="flex aspect-video items-center justify-center bg-slate-100 text-sm text-slate-500 dark:bg-slate-950">Upload not finished</div>}
     <div className="space-y-3 p-4">
-      {editing ? <form onSubmit={async (event) => { event.preventDefault(); if (await onPatch(video.id, { title, description })) setEditing(false); }} className="space-y-2"><input required minLength={2} maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} aria-label="Video title" className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm dark:border-slate-700 dark:bg-slate-950" /><textarea maxLength={500} rows={2} value={description} onChange={(event) => setDescription(event.target.value)} aria-label="Description" placeholder="Description (optional)" className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm dark:border-slate-700 dark:bg-slate-950" /><div className="flex gap-2"><button className="rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white">Save</button><button type="button" onClick={() => setEditing(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold dark:border-slate-700">Cancel</button></div></form>
+      {editing ? <form onSubmit={async (event) => { event.preventDefault(); if (await onPatch(video.id, { title, description })) setEditing(false); }} className="space-y-2"><input required minLength={2} maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} aria-label="Video title" className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm dark:border-slate-700 dark:bg-slate-950" /><textarea maxLength={500} rows={2} value={description} onChange={(event) => setDescription(event.target.value)} aria-label="Description" placeholder="Description (optional)" className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm dark:border-slate-700 dark:bg-slate-950" /><div className="flex gap-2"><button className="rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white">Save</button><button type="button" onClick={() => { setTitle(video.title); setDescription(video.description); setEditing(false); }} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold dark:border-slate-700">Cancel</button></div></form>
         : <div><h3 className="font-bold">{video.title}</h3>{video.description && <p className="mt-1 text-sm text-slate-500">{video.description}</p>}</div>}
       <p className="flex flex-wrap items-center gap-2 text-xs text-slate-500"><span className={`rounded-full px-2 py-0.5 font-bold ${!ready ? 'bg-amber-100 text-amber-700' : video.published ? 'bg-teal-100 text-teal-700' : 'bg-slate-200 text-slate-600'}`}>{!ready ? 'Uploading' : video.published ? 'On website' : 'Hidden'}</span>{formatMegabytes(video.sizeBytes)}</p>
       <div className="flex flex-wrap gap-2">
         {ready && <button type="button" onClick={() => onPatch(video.id, { published: !video.published })} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold dark:border-slate-700">{video.published ? <><EyeOff className="h-3.5 w-3.5" />Hide from website</> : <><Eye className="h-3.5 w-3.5" />Show on website</>}</button>}
         {ready && !editing && <button type="button" onClick={() => setEditing(true)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold dark:border-slate-700">Edit title</button>}
-        <button type="button" onClick={() => { if (window.confirm(`Delete "${video.title}"? This cannot be undone.`)) onDelete(video.id); }} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-red-600"><Trash2 className="h-3.5 w-3.5" />Delete</button>
+        {(ready || !uploading) && <button type="button" onClick={() => { if (window.confirm(`Delete "${video.title}"? This cannot be undone.`)) onDelete(video.id); }} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-red-600"><Trash2 className="h-3.5 w-3.5" />Delete</button>}
       </div>
     </div>
   </article>;
@@ -443,8 +450,8 @@ function VideosAdmin() {
   const busy = Boolean(progress);
   return <div className="space-y-6">
     <form onSubmit={submit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-      <div><h2 className="flex items-center gap-2 font-extrabold"><Film className="h-5 w-5 text-teal-600" />Upload a video</h2><p className="mt-1 text-sm text-slate-500">{hasNativeVideoUploader ? 'Videos over 100 MB are compressed automatically on this phone before uploading.' : 'Videos must be under 100 MB here. The ABI Doctor app compresses bigger videos automatically.'}</p></div>
-      <input ref={fileInput} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) choose({ file, name: file.name, sizeBytes: file.size, needsCompression: file.size > MAX_VIDEO_BYTES }); }} />
+      <div><h2 className="flex items-center gap-2 font-extrabold"><Film className="h-5 w-5 text-teal-600" />Upload a video</h2><p className="mt-1 text-sm text-slate-500">{hasNativeVideoUploader ? 'Videos over 100 MB are compressed automatically on this phone before uploading.' : isNativeApp ? 'Videos must be under 100 MB. Update ABI Doctor to compress bigger videos automatically.' : 'Videos must be under 100 MB here. The ABI Doctor app compresses bigger videos automatically.'}</p></div>
+      <input ref={fileInput} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (!file) return; if (file.size > MAX_VIDEO_BYTES) { setPicked(null); setMessage(''); setError(tooLargeMessage(file.size)); return; } choose({ file, name: file.name, sizeBytes: file.size, needsCompression: false }); }} />
       <button type="button" onClick={pick} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold disabled:opacity-60 dark:border-slate-700"><Upload className="h-4 w-4" />{picked ? 'Choose a different video' : 'Choose video'}</button>
       {picked && <>
         <p className="text-sm"><span className="font-semibold">{picked.name}</span> · {formatMegabytes(picked.sizeBytes)}{picked.needsCompression && hasNativeVideoUploader && <span className="text-teal-700 dark:text-teal-400"> · will be compressed to under 100 MB</span>}</p>
@@ -458,7 +465,7 @@ function VideosAdmin() {
       {error && <p className="rounded-xl bg-red-100 p-3 text-sm text-red-700" role="alert">{error}</p>}
     </form>
     {videos === null ? <Loading /> : videos.length === 0 ? <Empty>No videos yet. Uploaded videos appear on the clinic website.</Empty>
-      : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{videos.map((video) => <VideoCard key={video.id} video={video} onPatch={patch} onDelete={remove} />)}</div>}
+      : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{videos.map((video) => <VideoCard key={video.id} video={video} uploading={busy} onPatch={patch} onDelete={remove} />)}</div>}
   </div>;
 }
 
@@ -475,6 +482,10 @@ export default function AdminDashboard() {
   // Once the phone is registered for ringing pushes, the ring is the alert; a second local
   // notification from the 30-second refresh would only repeat it.
   const ringingPush = useRef(false);
+  // Whether the server knows to ring this phone: null while checking.
+  const [ringRegistered, setRingRegistered] = useState(null);
+  // The Videos tab stays mounted once opened, so switching tabs does not lose an upload in progress.
+  const [videosOpened, setVideosOpened] = useState(false);
 
   const load = useCallback(async ({ silent = false, notify = true } = {}) => {
     if (!silent) setLoading(true);
@@ -518,15 +529,22 @@ export default function AdminDashboard() {
     if (isNativeApp) {
       enableAppointmentNotifications().catch(() => {});
       api('/api/admin/mobile-config').then((config) => {
-        if (!config.pushNotifications) return undefined;
+        if (!config.pushNotifications) {
+          setRingRegistered(false);
+          return undefined;
+        }
         return registerPushNotifications(
           (token) => api('/api/admin/device-tokens', {
             method: 'POST',
             body: JSON.stringify({ token, platform: 'android', alertStyle: hasAppointmentAlerts ? 'ring' : 'notification' }),
-          }).then(() => { ringingPush.current = hasAppointmentAlerts; }),
+          }).then(() => {
+            ringingPush.current = hasAppointmentAlerts;
+            setRingRegistered(hasAppointmentAlerts);
+          }, () => setRingRegistered(false)),
           () => load({ silent: true, notify: false }),
+          { onReceive: () => load({ silent: true, notify: false }), onError: () => setRingRegistered(false) },
         );
-      }).then((stop) => { if (stop) stopPushNotifications = stop; }).catch(() => {});
+      }).then((stop) => { if (stop) stopPushNotifications = stop; }).catch(() => setRingRegistered(false));
     }
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible' && navigator.onLine) load({ silent: true });
@@ -564,5 +582,5 @@ export default function AdminDashboard() {
   if (authenticated === null) return <main className="min-h-screen bg-slate-950 text-white"><Loading /></main>;
   if (!authenticated) return <Login onLogin={() => { setAuthenticated(true); load(); }} />;
 
-  return <main className="min-h-screen bg-slate-50 pb-[env(safe-area-inset-bottom)] text-slate-900 dark:bg-slate-950 dark:text-slate-100"><header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3"><div><h1 className="text-lg font-extrabold sm:text-xl">ABI Doctor Dashboard</h1><p className={`flex items-center gap-1 text-xs ${connected ? 'text-teal-600' : 'text-red-500'}`}>{connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}{connected ? `Live${lastSynced ? ` · synced ${lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}` : 'Offline'}</p></div><div className="flex gap-2"><button onClick={() => load()} className="rounded-xl bg-slate-100 p-2.5 dark:bg-slate-900" aria-label="Refresh"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button><button onClick={logout} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-950"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Logout</span></button></div></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6"><nav className="mb-6 flex gap-2 overflow-x-auto pb-3">{TABS.map(([id, label, Icon]) => <button key={id} onClick={() => setTab(id)} className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'}`}><Icon className="h-4 w-4" />{label}</button>)}</nav>{message && <p className="mb-5 rounded-xl bg-green-100 p-3 text-sm text-green-700">{message}</p>}{error && <p className="mb-5 rounded-xl bg-red-100 p-3 text-sm text-red-700" role="alert">{error}</p>}{loading && !data.dashboard ? <Loading /> : <>{tab === 'overview' && <Overview data={data.dashboard} />}{tab === 'appointments' && <Appointments appointments={data.appointments} autoWhatsApp={Boolean(data.dashboard?.patientWhatsApp)} smsSender={data.dashboard?.smsSender} onUpdate={updateStatus} onResend={resend} onCopy={copy} />}{tab === 'schedule' && <Schedule data={data.schedule} onSave={(branchId, periods) => act(() => api(`/api/admin/schedule/${branchId}`, { method: 'PUT', body: JSON.stringify({ periods }) }), 'Working schedule saved.')} onToggleService={(id, active) => act(() => api(`/api/admin/services/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) }), 'Service availability updated.')} />}{tab === 'leaves' && <Leaves leaves={data.leaves} branches={data.schedule.branches} onCreate={(form) => act(() => api('/api/admin/leaves', { method: 'POST', body: JSON.stringify(form) }), 'Leave day added; public slots are updated.')} onDelete={(id) => act(() => api(`/api/admin/leaves/${id}`, { method: 'DELETE' }), 'Leave day removed.')} />}{tab === 'reviews' && <ReviewsAdmin reviews={data.reviews} branches={data.schedule.branches} onModerate={(id, status) => act(() => api(`/api/admin/reviews/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }), 'Review moderated.')} onDelete={(id) => act(() => api(`/api/admin/reviews/${id}`, { method: 'DELETE' }), 'Review deleted.')} />}{tab === 'sms' && <SmsPhone sender={data.dashboard?.smsSender} notify={notify} onRegister={registerSmsPhone} onRemove={() => act(() => api('/api/admin/sms-sender', { method: 'DELETE' }), 'Automatic SMS stopped. No phone is registered.')} onTest={(phone) => act(() => api('/api/admin/sms-sender/test', { method: 'POST', body: JSON.stringify({ phone }) }), 'Test SMS queued. It appears in Recent SMS when the phone sends it.')} onLimit={(dailyLimit) => act(() => api('/api/admin/sms-sender', { method: 'PATCH', body: JSON.stringify({ dailyLimit }) }), 'Daily SMS limit saved.')} />}{tab === 'videos' && <VideosAdmin />}{tab === 'clinics' && <Clinics branches={data.schedule.branches} onSaveReviewLink={(id, googleReviewUrl) => act(() => api(`/api/admin/branches/${id}`, { method: 'PATCH', body: JSON.stringify({ googleReviewUrl }) }), 'Google review link saved.')} />}</>}</div></main>;
+  return <main className="min-h-screen bg-slate-50 pb-[env(safe-area-inset-bottom)] text-slate-900 dark:bg-slate-950 dark:text-slate-100"><header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3"><div><h1 className="text-lg font-extrabold sm:text-xl">ABI Doctor Dashboard</h1><p className={`flex items-center gap-1 text-xs ${connected ? 'text-teal-600' : 'text-red-500'}`}>{connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}{connected ? `Live${lastSynced ? ` · synced ${lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}` : 'Offline'}</p></div><div className="flex gap-2"><button onClick={() => load()} className="rounded-xl bg-slate-100 p-2.5 dark:bg-slate-900" aria-label="Refresh"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button><button onClick={logout} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-950"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Logout</span></button></div></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6"><nav className="mb-6 flex gap-2 overflow-x-auto pb-3">{TABS.map(([id, label, Icon]) => <button key={id} onClick={() => { setTab(id); if (id === 'videos') setVideosOpened(true); }} className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'}`}><Icon className="h-4 w-4" />{label}</button>)}</nav>{message && <p className="mb-5 rounded-xl bg-green-100 p-3 text-sm text-green-700">{message}</p>}{error && <p className="mb-5 rounded-xl bg-red-100 p-3 text-sm text-red-700" role="alert">{error}</p>}{loading && !data.dashboard ? <Loading /> : <>{tab === 'overview' && <Overview data={data.dashboard} ringRegistered={ringRegistered} />}{tab === 'appointments' && <Appointments appointments={data.appointments} autoWhatsApp={Boolean(data.dashboard?.patientWhatsApp)} smsSender={data.dashboard?.smsSender} onUpdate={updateStatus} onResend={resend} onCopy={copy} />}{tab === 'schedule' && <Schedule data={data.schedule} onSave={(branchId, periods) => act(() => api(`/api/admin/schedule/${branchId}`, { method: 'PUT', body: JSON.stringify({ periods }) }), 'Working schedule saved.')} onToggleService={(id, active) => act(() => api(`/api/admin/services/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) }), 'Service availability updated.')} />}{tab === 'leaves' && <Leaves leaves={data.leaves} branches={data.schedule.branches} onCreate={(form) => act(() => api('/api/admin/leaves', { method: 'POST', body: JSON.stringify(form) }), 'Leave day added; public slots are updated.')} onDelete={(id) => act(() => api(`/api/admin/leaves/${id}`, { method: 'DELETE' }), 'Leave day removed.')} />}{tab === 'reviews' && <ReviewsAdmin reviews={data.reviews} branches={data.schedule.branches} onModerate={(id, status) => act(() => api(`/api/admin/reviews/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }), 'Review moderated.')} onDelete={(id) => act(() => api(`/api/admin/reviews/${id}`, { method: 'DELETE' }), 'Review deleted.')} />}{tab === 'sms' && <SmsPhone sender={data.dashboard?.smsSender} notify={notify} onRegister={registerSmsPhone} onRemove={() => act(() => api('/api/admin/sms-sender', { method: 'DELETE' }), 'Automatic SMS stopped. No phone is registered.')} onTest={(phone) => act(() => api('/api/admin/sms-sender/test', { method: 'POST', body: JSON.stringify({ phone }) }), 'Test SMS queued. It appears in Recent SMS when the phone sends it.')} onLimit={(dailyLimit) => act(() => api('/api/admin/sms-sender', { method: 'PATCH', body: JSON.stringify({ dailyLimit }) }), 'Daily SMS limit saved.')} />}{videosOpened && <div hidden={tab !== 'videos'}><VideosAdmin /></div>}{tab === 'clinics' && <Clinics branches={data.schedule.branches} onSaveReviewLink={(id, googleReviewUrl) => act(() => api(`/api/admin/branches/${id}`, { method: 'PATCH', body: JSON.stringify({ googleReviewUrl }) }), 'Google review link saved.')} />}</>}</div></main>;
 }

@@ -24,8 +24,8 @@ public class ClinicMessagingService extends MessagingService {
         }
         if ("appointment_request".equals(type)) {
             AppointmentAlerts.onNewRequest(getApplicationContext(), data.get("title"), data.get("body"));
-            return;
         }
+        // Capacitor passes data messages to an open dashboard, which then shows the new request at once.
         super.onMessageReceived(remoteMessage);
     }
 

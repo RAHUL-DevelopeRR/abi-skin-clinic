@@ -85,19 +85,25 @@ export async function notifyNewAppointments(count) {
   });
 }
 
-export async function registerPushNotifications(onToken, onOpen) {
+export async function registerPushNotifications(onToken, onOpen, { onReceive = () => {}, onError = () => {} } = {}) {
   if (!isNativeApp) return () => {};
   const current = await PushNotifications.checkPermissions();
   const permission = current.receive === 'granted'
     ? current
     : await PushNotifications.requestPermissions();
-  if (permission.receive !== 'granted') return () => {};
+  if (permission.receive !== 'granted') {
+    onError();
+    return () => {};
+  }
   const handles = [
     await PushNotifications.addListener('registration', ({ value }) => {
       latestPushToken = value;
       onToken(value);
     }),
+    await PushNotifications.addListener('registrationError', () => onError()),
     await PushNotifications.addListener('pushNotificationActionPerformed', () => onOpen()),
+    // A push that arrives while the dashboard is open (for example a new request) refreshes it at once.
+    await PushNotifications.addListener('pushNotificationReceived', () => onReceive()),
   ];
   await PushNotifications.register();
   return () => handles.forEach((handle) => handle.remove());

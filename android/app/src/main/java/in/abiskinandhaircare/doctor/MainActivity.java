@@ -24,7 +24,14 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
+        AppointmentAlerts.appInForeground = true;
         // The dashboard is on screen now, showing the request that rang.
         AppointmentAlerts.dismissAll(this);
+    }
+
+    @Override
+    public void onPause() {
+        AppointmentAlerts.appInForeground = false;
+        super.onPause();
     }
 }

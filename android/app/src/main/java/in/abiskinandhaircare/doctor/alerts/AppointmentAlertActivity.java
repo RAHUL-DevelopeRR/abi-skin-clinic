@@ -63,11 +63,12 @@ public class AppointmentAlertActivity extends AppCompatActivity {
     }
 
     private void openRequests() {
-        AppointmentAlerts.dismissAll(this);
         Intent open = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         KeyguardManager keyguard = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && keyguard != null && keyguard.isKeyguardLocked()) {
-            // Ask for the PIN or fingerprint first; the dashboard opens once the phone is unlocked.
+            // Stop the ring but keep the reminder until the dashboard is really open: the doctor
+            // may back out of the PIN prompt. MainActivity clears the reminder when it appears.
+            AppointmentAlerts.silence(this);
             keyguard.requestDismissKeyguard(this, new KeyguardManager.KeyguardDismissCallback() {
                 @Override
                 public void onDismissSucceeded() {
@@ -76,6 +77,7 @@ public class AppointmentAlertActivity extends AppCompatActivity {
                 }
             });
         } else {
+            AppointmentAlerts.dismissAll(this);
             startActivity(open);
             finish();
         }

@@ -72,9 +72,14 @@ async function removeExpiredUploads(env) {
   `).bind(utcTimestamp(new Date())).all();
   for (const row of results || []) {
     try {
-      if (row.upload_id) await requireBucket(env).resumeMultipartUpload(row.r2_key, row.upload_id).abort();
+      const bucket = requireBucket(env);
+      if (row.upload_id) await bucket.resumeMultipartUpload(row.r2_key, row.upload_id).abort().catch(() => {});
+      // complete() may have built the object before the row was marked ready.
+      await bucket.delete(row.r2_key);
     } catch (error) {
-      console.error('Could not abort an expired video upload.', error.message);
+      // Keep the row so the next listing retries the clean-up.
+      console.error('Could not remove an expired video upload.', error.message);
+      continue;
     }
     await env.DB.prepare('DELETE FROM clinic_videos WHERE id = ?').bind(row.id).run();
   }
@@ -214,9 +219,9 @@ export async function deleteVideo(env, id) {
   if (!row) throw new ApiError(404, 'VIDEO_NOT_FOUND', 'Video was not found.');
   if (row.status === 'uploading' && row.upload_id) {
     await bucket.resumeMultipartUpload(row.r2_key, row.upload_id).abort().catch(() => {});
-  } else {
-    await bucket.delete(row.r2_key);
   }
+  // Always, because complete() may have built the object before the row was marked ready.
+  await bucket.delete(row.r2_key);
   await env.DB.prepare('DELETE FROM clinic_videos WHERE id = ?').bind(id).run();
 }
 
